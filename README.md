@@ -81,33 +81,12 @@ ranked list of what defeats the call graph, and what the adversary broke.
 ## Known limitations
 
 - Python only.
-- **Reachability is not exploitability.** A reachable function may be uncallable with attacker input.
-  These 4 findings are a triage queue, not 4 confirmed exploits. The taint tracker narrows this and
-  does not close it: it is flow-sensitive inside a function, positional across a call, models no
-  sanitisers, and does not follow values carried on object state or in containers. It answered
-  `tainted` once and `undetermined` three times on this run, and it never answers `clean` when the
-  value reaches the receiver instead of the arguments.
-- Anything reflective is undetermined by construction. `getattr` with a computed name pulls the whole
-  target module into the undetermined set rather than resolving it.
+- Reachable doesn't mean exploitable. These 4 findings are leads to investigate, not confirmed exploits. The tracker found 1 tainted result and 3 undetermined.
+- Reflection is undetermined. Computed getattr names cause the entire target module to be marked undetermined.
 - C extensions are opaque. 129 compiled modules were seen and none were analysed.
-- Superset's 293 alembic migration files have filenames that are not valid module names, so they are
-  not indexed and not treated as entry points.
-- An `unreachable` verdict describes the source as committed. Installed plugins, feature flags, and
-  deployment configuration change the real entry point set.
-- Monkeypatching produces a confident wrong answer. If `Service.handle = other` replaces a method at
-  import time, the graph still points at the original `def handle`, and the path it prints looks
-  exactly like a correct one. See case 9 in [tests/adversarial/RESULTS.md](tests/adversarial/RESULTS.md).
-- Sink extraction is 40% accurate from advisory text alone. The wrong answers are caught by the
-  verifier and reported as undetermined, which is safe and still a large bucket.
+- Alembic migrations are skipped. Superset's 293 migration files have invalid module names, so they aren't indexed or treated as entry points.
+- unreachable can be wrong in deployment. Plugins, feature flags, and configuration can introduce new entry points.
+- Monkeypatching can mislead the graph. Reassigned methods still point to the original function. See case 9 in tests/adversarial/RESULTS.md.
+- Sink extraction is imperfect. Advisory text extraction is only ~40% accurate. The verifier catches wrong results and marks them undetermined.
 - Two of the four reachable findings have a class attribute as their sink, so "reachable" there means
   the class is constructed, not that a vulnerable function runs. See FINDINGS.md section 1.
-
-## How it is built
-
-`docs/SPEC.md` for the contract, `docs/ARCHITECTURE.md` for the module boundaries and the data
-schema. `make graph` prints the ranked list of what the resolver cannot see, which is section 4 of
-FINDINGS. Agent definitions are in `.claude/agents/`. The adversary agent wrote ten applications that
-execute a sink through a construct the resolver could not see, and all ten were reported unreachable
-on the first pass. After the fixes, none of them is. Three became precisely reachable rather than
-merely undetermined, one residual defect is documented above, and all ten are regression tests in
-`tests/test_adversarial.py`.
