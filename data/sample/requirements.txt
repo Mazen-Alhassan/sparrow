@@ -1,0 +1,16 @@
+# Pinned with pip-compile. Versions chosen to match a real 2023 deployment.
+blinker==1.6.2
+certifi==2023.7.22
+charset-normalizer==3.2.0
+click==8.1.3
+flask==2.3.2
+idna==3.4
+itsdangerous==2.1.2
+jinja2==3.1.2
+markupsafe==2.1.3
+pyjwt==2.4.0
+pyyaml==5.4.1
+requests==2.31.0
+sqlparse==0.4.4
+urllib3==1.26.6
+werkzeug==2.3.3

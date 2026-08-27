@@ -1,0 +1,11 @@
+[project]
+name = "sample-report-service"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = ["flask", "requests", "pyjwt", "pyyaml", "sqlparse"]
+
+[project.scripts]
+sample-cli = "app.cli:main"
+
+[project.entry-points."sample.plugins"]
+csv = "app.plugins:CsvExporter"
