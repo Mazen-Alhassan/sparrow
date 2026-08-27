@@ -1,0 +1,37 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-3ww4-gg4f-jr7f (CVE-2023-50782, GHSA-3ww4-gg4f-jr7f, PYSEC-2026-1283)
+Package: cryptography 41.0.2
+Fixed in: 42.0.0
+Severity: high
+
+Summary: Python Cryptography package vulnerable to Bleichenbacher timing oracle attack
+
+Details:
+A flaw was found in the python-cryptography package. This issue may allow a remote attacker to decrypt captured messages in TLS servers that use RSA key exchanges, which may lead to exposure of confidential or sensitive data.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2023-50782
+- WEB: https://github.com/pyca/cryptography/issues/9785
+- WEB: https://access.redhat.com/security/cve/CVE-2023-50782
+- WEB: https://bugzilla.redhat.com/show_bug.cgi?id=2254432
+- PACKAGE: https://github.com/pyca/cryptography
+- WEB: https://www.couchbase.com/alerts
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-3ww4-gg4f-jr7f", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

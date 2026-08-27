@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-hgf8-39gv-g3f2",
+  "package": "werkzeug",
+  "sinks": [
+    "werkzeug.security.safe_join"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 4b83337 adds the _windows_device_files check inside safe_join in src/werkzeug/security.py",
+  "assumptions": [
+    "assumes the flaw is in safe_join rather than in send_from_directory, its caller"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "werkzeug.security.safe_join": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.1.4",
+      "note": "body differs between 2.3.3 and 3.1.4",
+      "location": "werkzeug.security:safe_join"
+    }
+  }
+}

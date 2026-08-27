@@ -1,0 +1,60 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-v8gr-m533-ghj9 (none)
+Package: cryptography 41.0.2
+Fixed in: 41.0.4
+Severity: low
+
+Summary: Vulnerable OpenSSL included in cryptography wheels
+
+Details:
+pyca/cryptography's wheels include a statically linked copy of OpenSSL. The versions of OpenSSL included in cryptography 2.5-41.0.3 are vulnerable to several security issues. More details about the vulnerabilities themselves can be found in https://www.openssl.org/news/secadv/20230908.txt.
+
+If you are building cryptography source ("sdist") then you are responsible for upgrading your copy of OpenSSL. Only users installing from wheels built by the cryptography project (i.e., those distributed on PyPI) need to update their cryptography versions.
+
+References:
+- WEB: https://github.com/pyca/cryptography/security/advisories/GHSA-v8gr-m533-ghj9
+- WEB: https://github.com/pyca/cryptography/commit/fc11bce6930e591ce26a2317b31b9ce2b3e25512
+- PACKAGE: https://github.com/pyca/cryptography
+
+Fix commit, Python hunks only:
+--- https://github.com/pyca/cryptography/commit/fc11bce6930e591ce26a2317b31b9ce2b3e25512.patch ---
+diff --git a/src/cryptography/__about__.py b/src/cryptography/__about__.py
+index 27273ef0ab0e..a83d2d1d14b1 100644
+--- a/src/cryptography/__about__.py
++++ b/src/cryptography/__about__.py
+@@ -10,7 +10,7 @@
+     "__copyright__",
+ ]
+ 
+-__version__ = "41.0.3"
++__version__ = "41.0.4"
+ 
+ 
+ __author__ = "The Python Cryptographic Authority and individual contributors"
+diff --git a/vectors/cryptography_vectors/__about__.py b/vectors/cryptography_vectors/__about__.py
+index 2897b84cd9a1..f4c7a6fb90c4 100644
+--- a/vectors/cryptography_vectors/__about__.py
++++ b/vectors/cryptography_vectors/__about__.py
+@@ -6,4 +6,4 @@
+     "__version__",
+ ]
+ 
+-__version__ = "41.0.3"
++__version__ = "41.0.4"
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-v8gr-m533-ghj9", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

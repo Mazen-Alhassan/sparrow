@@ -1,0 +1,25 @@
+{
+  "advisory": "PYSEC-2023-117",
+  "package": "pygments",
+  "sinks": [
+    "pygments.lexers.smithy.SmithyLexer"
+  ],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked; the advisory names pygments/lexers/smithy.py and the SmithyLexer as the ReDoS location",
+  "assumptions": [
+    "the vulnerable regex is a class level token table, so the class node is named instead of a function",
+    "the regex is executed by RegexLexer.get_tokens_unprocessed in the base class"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "pygments.lexers.smithy.SmithyLexer": {
+      "status": "unchanged_in_fixed",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": false,
+      "vulnerable_version": "2.15.0",
+      "fixed_version": "2.15.1",
+      "note": "identical body in 2.15.0 and 2.15.1",
+      "location": "pygments.lexers.smithy:SmithyLexer"
+    }
+  }
+}

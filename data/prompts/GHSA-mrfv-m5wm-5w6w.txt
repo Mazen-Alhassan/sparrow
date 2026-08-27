@@ -1,0 +1,45 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-mrfv-m5wm-5w6w (CVE-2025-69277, GHSA-mrfv-m5wm-5w6w, PYSEC-2026-1448, PYSEC-2026-3002)
+Package: pynacl 1.5.0
+Fixed in: 1.6.2
+Severity: moderate
+
+Summary: libsodium has Incomplete List of Disallowed Inputs
+
+Details:
+libsodium before ad3004e, in atypical use cases involving certain custom cryptography or untrusted data to crypto_core_ed25519_is_valid_point, mishandles checks for whether an elliptic curve point is valid because it sometimes allows points that aren't in the main cryptographic group.
+
+This advisoory lists packages in the GitHub Advisory Database's [supported ecosystems](https://github.com/github/advisory-database?tab=readme-ov-file#supported-ecosystems) that are affected by this vulnerability due to a vulnerable dependency.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-69277
+- WEB: https://github.com/pyca/pynacl/issues/920
+- WEB: https://github.com/hdwallet-io/python-hdwallet/pull/124
+- WEB: https://github.com/jedisct1/libsodium/commit/ad3004ec8731730e93fcfbbc824e67eadc1c1bae
+- WEB: https://github.com/paragonie/sodium_compat/commit/2cb48f26130919f92f30650bdcc30e6f4ebe45ac
+- WEB: https://github.com/paragonie/sodium_compat/commit/4714da6efdc782c06690bc72ce34fae7941c2d9f
+- WEB: https://github.com/pyca/pynacl/commit/96314884d88d1089ff5f336dba61d7abbcddbbf7
+- WEB: https://github.com/pyca/pynacl/commit/ecf41f55a3d8f1e10ce89c61c4b4d67f3f4467cf
+- WEB: https://00f.net/2025/12/30/libsodium-vulnerability
+- WEB: https://github.com/FriendsOfPHP/security-advisories/blob/master/paragonie/sodium_compat/2025-12-30.yaml
+- PACKAGE: https://github.com/paragonie/sodium_compat
+- WEB: https://ianix.com/pub/ed25519-deployment.html
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-mrfv-m5wm-5w6w", "package": "pynacl", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

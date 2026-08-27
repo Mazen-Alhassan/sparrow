@@ -1,0 +1,298 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-w3h3-4rj7-4ph4 (CVE-2024-1135, GHSA-w3h3-4rj7-4ph4, PYSEC-2026-1434)
+Package: gunicorn 21.2.0
+Fixed in: 22.0.0
+Severity: high
+
+Summary: Request smuggling leading to endpoint restriction bypass in Gunicorn
+
+Details:
+Gunicorn fails to properly validate Transfer-Encoding headers, leading to HTTP Request Smuggling (HRS) vulnerabilities. By crafting requests with conflicting Transfer-Encoding headers, attackers can bypass security restrictions and access restricted endpoints. This issue is due to Gunicorn's handling of Transfer-Encoding headers, where it incorrectly processes requests with multiple, conflicting Transfer-Encoding headers, treating them as chunked regardless of the final encoding specified. This vulnerability has been shown to allow access to endpoints restricted by gunicorn. This issue has been addressed in version 22.0.0.
+
+To be affected users must have a network path which does not filter out invalid requests. These users are advised to block access to restricted endpoints via a firewall or other mechanism if they are unable to update.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-1135
+- WEB: https://github.com/benoitc/gunicorn/issues/3091
+- WEB: https://github.com/benoitc/gunicorn/pull/3113
+- WEB: https://github.com/benoitc/gunicorn/commit/ac29c9b0a758d21f1e0fb3b3457239e523fa9f1d
+- PACKAGE: https://github.com/benoitc/gunicorn
+- WEB: https://github.com/benoitc/gunicorn/releases/tag/22.0.0
+- WEB: https://huntr.com/bounties/22158e34-cfd5-41ad-97e0-a780773d96c1
+- WEB: https://lists.debian.org/debian-lts-announce/2024/06/msg00027.html
+- WEB: https://lists.debian.org/debian-lts-announce/2024/12/msg00018.html
+
+Fix commit, Python hunks only:
+--- https://github.com/benoitc/gunicorn/pull/3113.diff ---
+diff --git a/gunicorn/config.py b/gunicorn/config.py
+index 84e7619e4..e7e4fac54 100644
+--- a/gunicorn/config.py
++++ b/gunicorn/config.py
+@@ -2254,5 +2254,131 @@ class StripHeaderSpaces(Setting):
+         This is known to induce vulnerabilities and is not compliant with the HTTP/1.1 standard.
+         See https://portswigger.net/research/http-desync-attacks-request-smuggling-reborn.
+ 
+-        Use with care and only if necessary.
++        Use with care and only if necessary. May be removed in a future version.
++
++        .. versionadded:: 20.0.1
++        """
++
++
++class PermitUnconventionalHTTPMethod(Setting):
++    name = "permit_unconventional_http_method"
++    section = "Server Mechanics"
++    cli = ["--permit-unconventional-http-method"]
++    validator = validate_bool
++    action = "store_true"
++    default = False
++    desc = """\
++        Permit HTTP methods not matching conventions, such as IANA registration guidelines
++
++        This permits request methods of length less than 3 or more than 20,
++        methods with lowercase characters or methods containing the # character.
++        HTTP methods are case sensitive by definition, and merely uppercase by convention.
++
++        This option is provided to diagnose backwards-incompatible changes.
++
++        Use with care and only if necessary. May be removed in a future version.
++
++        .. versionadded:: 22.0.0
++        """
++
++
++class PermitUnconventionalHTTPVersion(Setting):
++    name = "permit_unconventional_http_version"
++    section = "Server Mechanics"
++    cli = ["--permit-unconventional-http-version"]
++    validator = validate_bool
++    action = "store_true"
++    default = False
++    desc = """\
++        Permit HTTP version not matching conventions of 2023
++
++        This disables the refusal of likely malformed request lines.
++        It is unusual to specify HTTP 1 versions other than 1.0 and 1.1.
++
++        This option is provided to diagnose backwards-incompatible changes.
++        Use with care and only if necessary. May be removed in a future version.
++
++        .. versionadded:: 22.0.0
++        """
++
++
++class CasefoldHTTPMethod(Setting):
++    name = "casefold_http_method"
++    section = "Server Mechanics"
++    cli = ["--casefold-http-method"]
++    validator = validate_bool
++    action = "store_true"
++    default = False
++    desc = """\
++         Transform received HTTP methods to uppercase
++
++         HTTP methods are case sensitive by definition, and merely uppercase by convention.
++
++         This option is provided because previous versions of gunicorn defaulted to this behaviour.
++
++         Use with care and only if necessary. May be removed in a future version.
++
++         .. versionadded:: 22.0.0
++         """
++
++
++def validate_header_map_behaviour(val):
++    # FIXME: refactor all of this subclassing stdlib argparse
++
++    if val is None:
++        return
++
++    if not isinstance(val, str):
++        raise TypeError("Invalid type for casting: %s" % val)
++    if val.lower().strip() == "drop":
++        return "drop"
++    elif val.lower().strip() == "refuse":
++        return "refuse"
++    elif val.lower().strip() == "dangerous":
++        return "dangerous"
++    else:
++        raise ValueError("Invalid header map behaviour: %s" % val)
++
++
++class HeaderMap(Setting):
++    name = "header_map"
++    section = "Server Mechanics"
++    cli = ["--header-map"]
++    validator = validate_header_map_behaviour
++    default = "drop"
++    desc = """\
++        Configure how header field names are mapped into environ
++
++        Headers containing underscores are permitted by RFC9110,
++        but gunicorn joining headers of different names into
++        the same environment variable will dangerously confuse applications as to which is which.
++
++        The safe default ``drop`` is to silently drop headers that cannot be unambiguously mapped.
++        The value ``refuse`` will return an error if a request contains *any* such header.
++        The value ``dangerous`` matches the previous, not advisabble, behaviour of mapping different
++        header field names into the same environ name.
++
++        Use with care and only if necessary and after considering if your problem could
++        instead be solved by specifically renaming or rewriting only the intended headers
++        on a proxy in front of Gunicorn.
++
++        .. versionadded:: 22.0.0
++        """
++
++
++class TolerateDangerousFraming(Setting):
++    name = "tolerate_dangerous_framing"
++    section = "Server Mechanics"
++    cli = ["--tolerate-dangerous-framing"]
++    validator = validate_bool
++    action = "store_true"
++    default = False
++    desc = """\
++        Process requests with both Transfer-Encoding and Content-Length
++
++        This is known to induce vulnerabilities, but not strictly forbidden by RFC9112.
++
++        Use with care and only if necessary. May be removed in a future version.
++
++        .. versionadded:: 22.0.0
+         """
+diff --git a/gunicorn/http/body.py b/gunicorn/http/body.py
+index aa1af2cb3..78f03214a 100644
+--- a/gunicorn/http/body.py
++++ b/gunicorn/http/body.py
+@@ -51,7 +51,7 @@ def parse_trailers(self, unreader, data):
+         if done:
+             unreader.unread(buf.getvalue()[2:])
+             return b""
+-        self.req.trailers = self.req.parse_headers(buf.getvalue()[:idx])
++        self.req.trailers = self.req.parse_headers(buf.getvalue()[:idx], from_trailer=True)
+         unreader.unread(buf.getvalue()[idx + 4:])
+ 
+     def parse_chunked(self, unreader):
+@@ -85,11 +85,13 @@ def parse_chunk_size(self, unreader, data=None):
+         data = buf.getvalue()
+         line, rest_chunk = data[:idx], data[idx + 2:]
+ 
+-        chunk_size = line.split(b";", 1)[0].strip()
+-        try:
+-            chunk_size = int(chunk_size, 16)
+-        except ValueError:
++        # RFC9112 7.1.1: BWS before chunk-ext - but ONLY then
++        chunk_size, *chunk_ext = line.split(b";", 1)
++        if chunk_ext:
++            chunk_size = chunk_size.rstrip(b" \t")
++        if any(n not in b"0123456789abcdefABCDEF" for n in chunk_size):
+             raise InvalidChunkSize(chunk_size)
++        chunk_size = int(chunk_size, 16)
+ 
+         if chunk_size == 0:
+             try:
+diff --git a/gunicorn/http/errors.py b/gunicorn/http/errors.py
+index 7839ef05a..340f0473c 100644
+--- a/gunicorn/http/errors.py
++++ b/gunicorn/http/errors.py
+@@ -22,6 +22,15 @@ def __str__(self):
+         return "No more data after: %r" % self.buf
+ 
+ 
++class ConfigurationProblem(ParseException):
++    def __init__(self, info):
++        self.info = info
++        self.code = 500
++
++    def __str__(self):
++        return "Configuration problem: %s" % self.info
++
++
+ class InvalidRequestLine(ParseException):
+     def __init__(self, req):
+         self.req = req
+@@ -64,6 +73,15 @@ def __str__(self):
+         return "Invalid HTTP header name: %r" % self.hdr
+ 
+ 
++class UnsupportedTransferCoding(ParseException):
++    def __init__(self, hdr):
++        self.hdr = hdr
++        self.code = 501
++
++    def __str__(self):
++        return "Unsupported transfer coding: %r" % self.hdr
++
++
+ class InvalidChunkSize(IOError):
+     def __init__(self, data):
+         self.data = data
+diff --git a/gunicorn/http/message.py b/gunicorn/http/message.py
+index 1f93c7145..5e8d2427d 100644
+--- a/gunicorn/http/message.py
++++ b/gunicorn/http/message.py
+@@ -12,6 +12,7 @@
+     InvalidHeader, InvalidHeaderName, NoMoreData,
+     InvalidRequestLine, InvalidRequestMethod, InvalidHTTPVersion,
+     LimitRequestLine, LimitRequestHeaders,
++    UnsupportedTransferCoding,
+ )
+ from gunicorn.http.errors import InvalidProxyLine, ForbiddenProxyRequest
+ from gunicorn.http.errors import InvalidSchemeHeaders
+@@ -21,9 +22,12 @@
+ MAX_HEADERS = 32768
+ DEFAULT_MAX_HEADERFIELD_SIZE = 8190
+ 
+-HEADER_RE = re.compile(r"[\x00-\x1F\x7F()<>@,;:\[\]={} \t\\\"]")
+-METH_RE = re.compile(r"[A-Z0-9$-_.]{3,20}")
+-VERSION_RE = re.compile(r"HTTP/(\d+)\.(\d+)")
++# verbosely on purpose, avoid backslash ambiguity
++RFC9110_5_6_2_TOKEN_SPECIALS = r"!#$%&'*+-.^_`|~"
++TOKEN_RE = re.compile(r"[%s0-9a-zA-Z]+" % (re.escape(RFC9110_5_6_2_TOKEN_SPECIALS)))
++METHOD_BADCHAR_RE = re.compile("[a-z#]")
++# usually 1.0 or 1.1 - RFC9112 permits restricting to single-digit versions
++VERSION_RE = re.compile(r"HTTP/(\d)\.(\d)")
+ 
+ 
+ class Message(object):
+@@ -37,6 +41,7 @@ def __init__(self, cfg, unreader, peer_addr):
+         self.trailers = []
+         self.body = None
+         self.scheme = "https" if cfg.is_ssl else "http"
++        self.must_close = False
+ 
+         # set headers limits
+         self.limit_request_fields = cfg.limit_request_fields
+@@ -56,22 +61,29 @@ def __init__(self, cfg, unreader, peer_addr):
+         self.unreader.unread(unused)
+         self.set_body_reader()
+ 
++    def force_close(self):
++        self.must_close = True
++
+     def parse(self, unreader):
+         raise NotImplementedError()
+ 
+-    def parse_headers(self, data):
++    def parse_headers(self, data, from_trailer=False):
+         cfg = self.cfg
+         headers = []
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-w3h3-4rj7-4ph4", "package": "gunicorn", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

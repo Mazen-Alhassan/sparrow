@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-qccp-gfcp-xxvc",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.connectionpool.HTTPConnectionPool.urlopen"
+  ],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked; the advisory says the low level redirect path in HTTPConnection.urlopen does not strip sensitive headers the way the pool manager does",
+  "assumptions": [
+    "the function name was inferred from the advisory prose",
+    "the fix in 2.7.0 may add a new helper rather than change urlopen"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.connectionpool.HTTPConnectionPool.urlopen": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.7.0",
+      "note": "body differs between 1.26.6 and 2.7.0",
+      "location": "urllib3.connectionpool:HTTPConnectionPool.urlopen"
+    }
+  }
+}

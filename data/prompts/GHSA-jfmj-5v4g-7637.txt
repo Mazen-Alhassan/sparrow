@@ -1,0 +1,171 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-jfmj-5v4g-7637 (CVE-2024-5569, GHSA-jfmj-5v4g-7637, PYSEC-2026-2074)
+Package: zipp 3.15.0
+Fixed in: 3.19.1
+Severity: moderate
+
+Summary: zipp Denial of Service vulnerability
+
+Details:
+A Denial of Service (DoS) vulnerability exists in the jaraco/zipp library, affecting all versions prior to 3.19.1. The vulnerability is triggered when processing a specially crafted zip file that leads to an infinite loop. This issue also impacts the zipfile module of CPython, as features from the third-party zipp library are later merged into CPython, and the affected code is identical in both projects. The infinite loop can be initiated through the use of functions affecting the `Path` module in both zipp and zipfile, such as `joinpath`, the overloaded division operator, and `iterdir`. Although the infinite loop is not resource exhaustive, it prevents the application from responding. The vulnerability was addressed in version 3.19.1 of jaraco/zipp.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-5569
+- WEB: https://github.com/jaraco/zipp/commit/fd604bd34f0343472521a36da1fbd22e793e14fd
+- PACKAGE: https://github.com/jaraco/zipp
+- WEB: https://huntr.com/bounties/be898306-11f9-46b4-b28c-f4c4aa4ffbae
+
+Fix commit, Python hunks only:
+--- https://github.com/jaraco/zipp/commit/fd604bd34f0343472521a36da1fbd22e793e14fd.patch ---
+diff --git a/tests/test_path.py b/tests/test_path.py
+index bbf39b2..53f8848 100644
+--- a/tests/test_path.py
++++ b/tests/test_path.py
+@@ -571,3 +571,21 @@ def test_getinfo_missing(self, alpharep):
+         zipfile.Path(alpharep)
+         with self.assertRaises(KeyError):
+             alpharep.getinfo('does-not-exist')
++
++    @__import__('pytest').mark.skip(reason="infinite loop")
++    def test_malformed_paths(self):
++        """
++        Path should handle malformed paths.
++        """
++        data = io.BytesIO()
++        zf = zipfile.ZipFile(data, "w")
++        zf.writestr("/one-slash.txt", b"content")
++        zf.writestr("//two-slash.txt", b"content")
++        zf.writestr("../parent.txt", b"content")
++        zf.filename = ''
++        root = zipfile.Path(zf)
++        assert list(map(str, root.iterdir())) == [
++            'one-slash.txt',
++            'two-slash.txt',
++            'parent.txt',
++        ]
+---
+ zipp/__init__.py | 62 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+diff --git a/zipp/__init__.py b/zipp/__init__.py
+index b08016c..b2f5013 100644
+--- a/zipp/__init__.py
++++ b/zipp/__init__.py
+@@ -86,6 +86,68 @@ def __setstate__(self, state):
+         super().__init__(*args, **kwargs)
+ 
+ 
++class SanitizedNames:
++    """
++    ZipFile mix-in to ensure names are sanitized.
++    """
++
++    def namelist(self):
++        return list(map(self._sanitize, super().namelist()))
++
++    @staticmethod
++    def _sanitize(name):
++        r"""
++        Ensure a relative path with posix separators and no dot names.
++
++        Modeled after
++        https://github.com/python/cpython/blob/bcc1be39cb1d04ad9fc0bd1b9193d3972835a57c/Lib/zipfile/__init__.py#L1799-L1813
++        but provides consistent cross-platform behavior.
++
++        >>> san = SanitizedNames._sanitize
++        >>> san('/foo/bar')
++        'foo/bar'
++        >>> san('//foo.txt')
++        'foo.txt'
++        >>> san('foo/.././bar.txt')
++        'foo/bar.txt'
++        >>> san('foo../.bar.txt')
++        'foo../.bar.txt'
++        >>> san('\\foo\\bar.txt')
++        'foo/bar.txt'
++        >>> san('D:\\foo.txt')
++        'D/foo.txt'
++        >>> san('\\\\server\\share\\file.txt')
++        'server/share/file.txt'
++        >>> san('\\\\?\\GLOBALROOT\\Volume3')
++        '?/GLOBALROOT/Volume3'
++        >>> san('\\\\.\\PhysicalDrive1\\root')
++        'PhysicalDrive1/root'
++
++        Retain any trailing slash.
++        >>> san('abc/')
++        'abc/'
++
++        Raises a ValueError if the result is empty.
++        >>> san('../..')
++        Traceback (most recent call last):
++        ...
++        ValueError: Empty filename
++        """
++
++        def allowed(part):
++            return part and part not in {'..', '.'}
++
++        # Remove the drive letter.
++        # Don't use ntpath.splitdrive, because that also strips UNC paths
++        bare = re.sub('^([A-Z]):', r'\1', name, flags=re.IGNORECASE)
++        clean = bare.replace('\\', '/')
++        parts = clean.split('/')
++        joined = '/'.join(filter(allowed, parts))
++        if not joined:
++            raise ValueError("Empty filename")
++        return joined + '/' * name.endswith('/')
++
++
+ class CompleteDirs(InitializedState, zipfile.ZipFile):
+     """
+     A ZipFile subclass that ensures that implied directories
+---
+ tests/test_path.py | 1 -
+ zipp/__init__.py   | 2 +-
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+diff --git a/tests/test_path.py b/tests/test_path.py
+index 53f8848..ace8763 100644
+--- a/tests/test_path.py
++++ b/tests/test_path.py
+@@ -572,7 +572,6 @@ def test_getinfo_missing(self, alpharep):
+         with self.assertRaises(KeyError):
+             alpharep.getinfo('does-not-exist')
+ 
+-    @__import__('pytest').mark.skip(reason="infinite loop")
+     def test_malformed_paths(self):
+         """
+         Path should handle malformed paths.
+diff --git a/zipp/__init__.py b/zipp/__init__.py
+index b2f5013..f41ae08 100644
+--- a/zipp/__init__.py
++++ b/zipp/__init__.py
+@@ -148,7 +148,7 @@ def allowed(part):
+         return joined + '/' * name.endswith('/')
+ 
+ 
+-class CompleteDirs(InitializedState, zipfile.ZipFile):
++class CompleteDirs(InitializedState, SanitizedNames, zipfile.ZipFile):
+     """
+     A ZipFile subclass that ensures that implied directories
+     are always included in the namelist.
+---
+ newsfragments/119.bugfix.rst | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 newsfragments/119.bugfix.rst
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-jfmj-5v4g-7637", "package": "zipp", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

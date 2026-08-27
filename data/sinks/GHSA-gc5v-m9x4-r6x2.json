@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-gc5v-m9x4-r6x2",
+  "package": "requests",
+  "sinks": [
+    "requests.utils.extract_zipped_paths"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 66d21cb replaces the predictable temp path in extract_zipped_paths with tempfile.mkstemp",
+  "assumptions": [
+    "the advisory itself says standard use of requests does not call this function"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "requests.utils.extract_zipped_paths": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.31.0",
+      "fixed_version": "2.33.0",
+      "note": "body differs between 2.31.0 and 2.33.0",
+      "location": "requests.utils:extract_zipped_paths"
+    }
+  }
+}

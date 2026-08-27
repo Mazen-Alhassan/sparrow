@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-38jv-5279-wg99",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.response.HTTPResponse.drain_conn"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 8864ac4 changes HTTPResponse.drain_conn in src/urllib3/response.py so a redirect body is not decoded",
+  "assumptions": [
+    "the fix targets the 2.x tree and this pin is 1.26.6, where drain_conn exists with the same body",
+    "assumes the flaw is in drain_conn and not in the redirect handling in HTTPConnectionPool.urlopen that calls it"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.response.HTTPResponse.drain_conn": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.6.3",
+      "note": "body differs between 1.26.6 and 2.6.3",
+      "location": "urllib3.response:HTTPResponse.drain_conn"
+    }
+  }
+}

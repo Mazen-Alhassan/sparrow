@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-gmj6-6f8f-6699",
+  "package": "jinja2",
+  "sinks": [
+    "jinja2.compiler.CodeGenerator.visit_FromImport"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 767b236 escapes the template position inside visit_FromImport in src/jinja2/compiler.py before it is compiled into an f-string",
+  "assumptions": [
+    "assumes the enclosing class is CodeGenerator, which the hunk header does not show"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "jinja2.compiler.CodeGenerator.visit_FromImport": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.1.2",
+      "fixed_version": "3.1.5",
+      "note": "body differs between 3.1.2 and 3.1.5",
+      "location": "jinja2.compiler:CodeGenerator.visit_FromImport"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-qccp-gfcp-xxvc (CVE-2026-44431, GHSA-qccp-gfcp-xxvc, PYSEC-2026-141)
+Package: urllib3 1.26.6
+Fixed in: 2.7.0
+Severity: high
+
+Summary: urllib3: Sensitive headers forwarded across origins in proxied low-level redirects
+
+Details:
+### Impact
+
+When following cross-origin redirects for requests made using urllib3’s high-level APIs, such as `urllib3.request()`, `PoolManager.request()`, and `ProxyManager.request()`, sensitive headers — `Authorization`, `Cookie`, and `Proxy-Authorization` (defined in `Retry.DEFAULT_REMOVE_HEADERS_ON_REDIRECT`) — are stripped by default, as expected.
+
+However, cross-origin redirects followed from the low-level API via `ProxyManager.connection_from_url().urlopen(..., assert_same_host=False)` still forward these sensitive headers.
+
+### Affected usage
+
+Applications and libraries using urllib3 versions earlier than 2.7.0 may be affected if they allow cross-origin redirects while making requests through `HTTPConnection.urlopen()` instances created via `ProxyManager.connection_from_url()`.
+
+### Remediation
+
+Upgrade to urllib3 version 2.7.0 or later, in which sensitive headers are stripped from redirects followed by `HTTPConnection`.
+
+If upgrading is not immediately possible, avoid using this low-level redirect flow for cross-origin redirects. If appropriate for your use case, switch to `ProxyManager.request()`.
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-qccp-gfcp-xxvc
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-44431
+- PACKAGE: https://github.com/urllib3/urllib3
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-qccp-gfcp-xxvc", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

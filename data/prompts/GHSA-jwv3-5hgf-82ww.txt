@@ -1,0 +1,184 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-jwv3-5hgf-82ww (CVE-2026-69249, GHSA-jwv3-5hgf-82ww, PYSEC-2026-3553)
+Package: cryptography 41.0.2
+Fixed in: 49.0.0
+Severity: high
+
+Summary: python-cryptography: Duplicate self-signed intermediates can cause exponential path-building
+
+Details:
+### Summary
+When resolving invalid certificate chains that include duplicate copies of self-signed certificates, the processing recursively invokes the same candidate, leading to an exponential blowup. Although the limitation that the chain depth cannot exceed a specified maximum depth prevents unbounded recursion and guarantees termination, an attacker-controlled certificate chain can lead the processing to easily take more than 5s to reject in testing. This amplification could form the basis for a resource exhaustion denial of service attack.
+
+This work was completed by Trail of Bits as part of the Patch The Planet project in collaboration with OpenAI. The finding was identified primarily by the Codex coding agent, and manually reviewed before submission. 
+
+### Details
+The core issue arises in the recursive nature of `build_chain_inner`, which does not de-duplicate against previously analyzed candidates.
+
+```python
+    fn build_chain_inner(
+        &self,
+        working_cert: &VerificationCertificate<'chain, B>,
+        current_depth: u8,
+        working_cert_extensions: &Extensions<'chain>,
+        name_chain: NameChain<'_, 'chain>,
+        budget: &mut Budget,
+    ) -> ValidationResult<'chain, Chain<'chain, B>, B> {
+        if let Some(nc) = working_cert_extensions.get_extension(&NAME_CONSTRAINTS_OID) {
+            name_chain.evaluate_constraints(&nc.value()?, budget)?;
+        }
+
+        // Look in the store's root set to see if the working cert is listed.
+        // If it is, we've reached the end.
+        if self.store.contains(working_cert) {
+            return Ok(vec![working_cert.clone()]);
+        }
+
+        // Check that our current depth does not exceed our policy-configured
+        // max depth. We do this after the root set check, since the depth
+        // only measures the intermediate chain's length, not the root or leaf.
+        if current_depth > self.policy.max_chain_depth {
+            return Err(ValidationError::new(ValidationErrorKind::Other(
+                "chain construction exceeds max depth".into(),
+            )));
+        }
+
+        // Otherwise, we collect a list of potential issuers for this cert,
+        // and continue with the first that verifies.
+        let mut last_err: Option<ValidationError<'_, B>> = None;
+        for issuing_cert_candidate in self.potential_issuers(working_cert) {
+            // A candidate issuer is said to verify if it both
+            // signs for the working certificate and conforms to the
+            // policy.
+            let issuer_extensions = issuing_cert_candidate.certificate().extensions()?;
+            match self.policy.valid_issuer(
+                issuing_cert_candidate,
+                working_cert,
+                current_depth,
+                &issuer_extensions,
+            ) {
+                Ok(_) => {
+                    match self.build_chain_inner(
+```
+
+A sufficient patch is to track valid issuers, and to skip seen ones before recursing. By tracking valid issuers only, validation and custom extension-policy callbacks still run.
+
+```rust
+          let mut seen_valid_issuers = Vec::<&VerificationCertificate<'chain, B>>::new();
+          for issuing_cert_candidate in self.potential_issuers(working_cert) {
+          . . .
+                  Ok(_) => {
+                      if seen_valid_issuers.contains(&issuing_cert_candidate) {
+                         continue;
+                      }
+                      seen_valid_issuers.push(issuing_cert_candidate);
+ 
+                      match self.build_chain_inner(
+                          issuing_cert_candidate,
+                          // NOTE(ww): According to RFC 5280, we should only
+```
+
+In testing, this fix removed the exponential blowup without breaking apparent correctness. 
+
+```
+duplicates,max_depth,result,seconds
+1,7,rejected,0.000464 -> 1,7,rejected,0.000667
+2,7,rejected,0.025154 -> 2,7,rejected,0.001229
+3,7,rejected,0.489924 -> 3,7,rejected,0.001619 
+4,7,rejected,4.309403 -> 4,7,rejected,0.002144
+3,8,rejected,1.468193 -> 3,8,rejected,0.001811
+4,8,timeout>5s,       -> 4,8,rejected,0.002410
+5,7,timeout>5s,       -> 5,7,rejected,0.002640
+6,6,timeout>5s,       -> 6,6,rejected,0.002829
+```
+
+### PoC
+The following script benchmarks processing times for malicious cert chains.
+
+```python
+import datetime
+import multiprocessing
+import time
+
+import cryptography
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
+from cryptography.x509.verification import (
+    DNSName,
+    PolicyBuilder,
+    Store,
+    VerificationError,
+)
+
+NOW = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
+TIMEOUT = 5
+CA_KEY_USAGE = x509.KeyUsage(
+    digital_signature=True,
+    content_commitment=False,
+    key_encipherment=False,
+    data_encipherment=False,
+    key_agreement=False,
+    key_cert_sign=True,
+    crl_sign=True,
+    encipher_only=False,
+    decipher_only=False,
+)
+EE_KEY_USAGE = x509.KeyUsage(
+    digital_signature=True,
+    content_commitment=False,
+    key_encipherment=False,
+    data_encipherment=False,
+    key_agreement=False,
+    key_cert_sign=False,
+    crl_sign=False,
+    encipher_only=False,
+    decipher_only=False,
+)
+
+def name(common_name):
+    return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+
+def base_builder(subject, issuer, public_key, serial):
+    return (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(public_key)
+        .serial_number(serial)
+        .not_valid_before(NOW - datetime.timedelta(days=1))
+        .not_valid_after(NOW + datetime.timedelta(days=30))
+    )
+
+def make_ca(common_name, serial):
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    subject = name(common_name)
+    cert = (
+        base_builder(subject, subject, private_key.public_key(), serial)
+        .add_extension(x509.BasicConstraints(c
+
+References:
+- WEB: https://github.com/pyca/cryptography/security/advisories/GHSA-jwv3-5hgf-82ww
+- WEB: https://github.com/pyca/cryptography/pull/14960
+- WEB: https://github.com/pyca/cryptography/commit/4a12cf49675a184e47f912b00b04f3a629283582
+- PACKAGE: https://github.com/pyca/cryptography
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-jwv3-5hgf-82ww", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

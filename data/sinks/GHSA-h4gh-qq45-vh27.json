@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-h4gh-qq45-vh27",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the advisory is about the statically linked OpenSSL inside the published wheels, not about Python code",
+  "assumptions": [
+    "assumes a bundled-binary advisory has no Python sink"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

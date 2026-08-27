@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-q34m-jh98-gwm2",
+  "package": "werkzeug",
+  "sinks": [
+    "werkzeug.formparser.MultiPartParser.parse"
+  ],
+  "confidence": "medium",
+  "evidence": "the visible Python hunks are quart's copy of the same fix, which adds per-field size tracking to MultiPartParser.parse; the werkzeug commit makes the same change",
+  "assumptions": [
+    "the werkzeug diff was not shown, so the function name was mapped from quart's parallel implementation",
+    "assumes werkzeug 2.3.3 names it MultiPartParser.parse in werkzeug.formparser"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "werkzeug.formparser.MultiPartParser.parse": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.0.6",
+      "note": "body differs between 2.3.3 and 3.0.6",
+      "location": "werkzeug.formparser:MultiPartParser.parse"
+    }
+  }
+}

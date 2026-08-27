@@ -1,0 +1,34 @@
+{
+  "advisory": "GHSA-428g-f7cq-pgp5",
+  "package": "marshmallow",
+  "sinks": [
+    "marshmallow.error_store.merge_errors",
+    "marshmallow.error_store.ErrorStore.store_error"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit d24a0c9 rewrites merge_errors to mutate in place instead of copying dicts on every merge, and adds a deepcopy in store_error",
+  "assumptions": [
+    "assumes the quadratic behaviour is in merge_errors rather than in Schema._do_load which calls it once per item"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "marshmallow.error_store.merge_errors": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.19.0",
+      "fixed_version": "3.26.2",
+      "note": "body differs between 3.19.0 and 3.26.2",
+      "location": "marshmallow.error_store:merge_errors"
+    },
+    "marshmallow.error_store.ErrorStore.store_error": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.19.0",
+      "fixed_version": "3.26.2",
+      "note": "body differs between 3.19.0 and 3.26.2",
+      "location": "marshmallow.error_store:ErrorStore.store_error"
+    }
+  }
+}

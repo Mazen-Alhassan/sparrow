@@ -1,0 +1,267 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-2qfp-q593-8484 (CVE-2025-6176, GHSA-2qfp-q593-8484, PYSEC-2026-1906, PYSEC-2026-2401)
+Package: brotli 1.0.9
+Fixed in: 1.2.0
+Severity: high
+
+Summary: Scrapy is vulnerable to a denial of service (DoS) attack due to flaws in brotli decompression implementation
+
+Details:
+Scrapy versions up to 2.13.3 are vulnerable to a denial of service (DoS) attack due to a flaw in its brotli decompression implementation. The protection mechanism against decompression bombs fails to mitigate the brotli variant, allowing remote servers to crash clients with less than 80GB of available memory. This occurs because brotli can achieve extremely high compression ratios for zero-filled data, leading to excessive memory consumption during decompression. Mitigation for this vulnerability needs security enhancement added in brotli v1.2.0.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-6176
+- WEB: https://github.com/google/brotli/issues/1327
+- WEB: https://github.com/google/brotli/issues/1375
+- WEB: https://github.com/google/brotli/pull/1234
+- WEB: https://github.com/scrapy/scrapy/pull/7134
+- WEB: https://github.com/google/brotli/commit/67d78bc41db1a0d03f2e763497748f2f69946627
+- WEB: https://github.com/scrapy/scrapy/commit/14737e91edc513967f516fc839cc9c8a4f8d91da
+- PACKAGE: https://github.com/google/brotli
+- WEB: https://github.com/google/brotli/releases/tag/v1.2.0
+- WEB: https://huntr.com/bounties/2c26a886-5984-47ee-a421-0d5fe1344eb0
+
+Fix commit, Python hunks only:
+--- https://github.com/google/brotli/pull/1234.diff ---
+diff --git a/python/tests/decompressor_test.py b/python/tests/decompressor_test.py
+index 05918ada8..09a76f3ee 100644
+--- a/python/tests/decompressor_test.py
++++ b/python/tests/decompressor_test.py
+@@ -4,6 +4,7 @@
+ # See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+ 
+ import functools
++import os
+ import unittest
+ 
+ from . import _test_utils
+@@ -39,10 +40,51 @@ def _decompress(self, test_data):
+                     out_file.write(self.decompressor.process(data))
+         self.assertTrue(self.decompressor.is_finished())
+ 
++    def _decompress_with_limit(self, test_data, max_output_length):
++        temp_uncompressed = _test_utils.get_temp_uncompressed_name(test_data)
++        with open(temp_uncompressed, 'wb') as out_file:
++            with open(test_data, 'rb') as in_file:
++                chunk_iter = iter(functools.partial(in_file.read, 10 * 1024), b'')
++                while not self.decompressor.is_finished():
++                    data = b''
++                    if self.decompressor.can_accept_more_data():
++                        data = next(chunk_iter, b'')
++                    decompressed_data = self.decompressor.process(data, max_output_length=max_output_length)
++                    self.assertTrue(len(decompressed_data) <= max_output_length)
++                    out_file.write(decompressed_data)
++                self.assertTrue(next(chunk_iter, None) == None)
++
+     def _test_decompress(self, test_data):
+         self._decompress(test_data)
+         self._check_decompression(test_data)
+ 
++    def _test_decompress_with_limit(self, test_data):
++        self._decompress_with_limit(test_data, max_output_length=20)
++        self._check_decompression(test_data)
++
++    def test_too_much_input(self):
++        with open(os.path.join(_test_utils.TESTDATA_DIR, "zerosukkanooa.compressed"), 'rb') as in_file:
++            compressed = in_file.read()
++            self.decompressor.process(compressed[:-1], max_output_length=1)
++            # the following assertion checks whether the test setup is correct
++            self.assertTrue(not self.decompressor.can_accept_more_data())
++            with self.assertRaises(brotli.error):
++                self.decompressor.process(compressed[-1:])
++
++    def test_changing_limit(self):
++        test_data = os.path.join(_test_utils.TESTDATA_DIR, "zerosukkanooa.compressed")
++        temp_uncompressed = _test_utils.get_temp_uncompressed_name(test_data)
++        with open(temp_uncompressed, 'wb') as out_file:
++            with open(test_data, 'rb') as in_file:
++                compressed = in_file.read()
++                uncompressed = self.decompressor.process(compressed[:-1], max_output_length=1)
++                self.assertTrue(len(uncompressed) <= 1)
++                out_file.write(uncompressed)
++                while not self.decompressor.can_accept_more_data():
++                    out_file.write(self.decompressor.process(b''))
++                out_file.write(self.decompressor.process(compressed[-1:]))
++        self._check_decompression(test_data)
++
+     def test_garbage_appended(self):
+         with self.assertRaises(brotli.error):
+             self.decompressor.process(brotli.compress(b'a') + b'a')
+
+--- https://github.com/scrapy/scrapy/pull/7134.diff ---
+diff --git a/conftest.py b/conftest.py
+index ece57eecc6d..0dd9d1ee049 100644
+--- a/conftest.py
++++ b/conftest.py
+@@ -117,6 +117,16 @@ def requires_boto3(request):
+         pytest.skip("boto3 is not installed")
+ 
+ 
++@pytest.fixture(autouse=True)
++def requires_mitmproxy(request):
++    if not request.node.get_closest_marker("requires_mitmproxy"):
++        return
++    try:
++        import mitmproxy  # noqa: F401, PLC0415
++    except ImportError:
++        pytest.skip("mitmproxy is not installed")
++
++
+ def pytest_configure(config):
+     if config.getoption("--reactor") == "asyncio":
+         # Needed on Windows to switch from proactor to selector for Twisted reactor compatibility.
+diff --git a/scrapy/downloadermiddlewares/httpcompression.py b/scrapy/downloadermiddlewares/httpcompression.py
+index f729649a079..fd508f75979 100644
+--- a/scrapy/downloadermiddlewares/httpcompression.py
++++ b/scrapy/downloadermiddlewares/httpcompression.py
+@@ -31,14 +31,20 @@
+ ACCEPTED_ENCODINGS: list[bytes] = [b"gzip", b"deflate"]
+ 
+ try:
+-    try:
+-        import brotli  # noqa: F401
+-    except ImportError:
+-        import brotlicffi  # noqa: F401
++    import brotli
+ except ImportError:
+     pass
+ else:
+-    ACCEPTED_ENCODINGS.append(b"br")
++    try:
++        brotli.Decompressor.can_accept_more_data
++    except AttributeError:  # pragma: no cover
++        warnings.warn(
++            "You have brotli installed. But 'br' encoding support now requires "
++            "brotli version >= 1.2.0. Please upgrade brotli version to make Scrapy "
++            "decode 'br' encoded responses.",
++        )
++    else:
++        ACCEPTED_ENCODINGS.append(b"br")
+ 
+ try:
+     import zstandard  # noqa: F401
+@@ -116,13 +122,13 @@ def process_response(
+                     decoded_body, content_encoding = self._handle_encoding(
+                         response.body, content_encoding, max_size
+                     )
+-                except _DecompressionMaxSizeExceeded:
++                except _DecompressionMaxSizeExceeded as e:
+                     raise IgnoreRequest(
+                         f"Ignored response {response} because its body "
+-                        f"({len(response.body)} B compressed) exceeded "
+-                        f"DOWNLOAD_MAXSIZE ({max_size} B) during "
+-                        f"decompression."
+-                    )
++                        f"({len(response.body)} B compressed, "
++                        f"{e.decompressed_size} B decompressed so far) exceeded "
++                        f"DOWNLOAD_MAXSIZE ({max_size} B) during decompression."
++                    ) from e
+                 if len(response.body) < warn_size <= len(decoded_body):
+                     logger.warning(
+                         f"{response} body size after decompression "
+@@ -202,7 +208,7 @@ def _warn_unknown_encoding(
+             f"from unsupported encoding(s) '{encodings_str}'."
+         )
+         if b"br" in encodings:
+-            msg += " You need to install brotli or brotlicffi to decode 'br'."
++            msg += " You need to install brotli >= 1.2.0 to decode 'br'."
+         if b"zstd" in encodings:
+             msg += " You need to install zstandard to decode 'zstd'."
+         logger.warning(msg)
+diff --git a/scrapy/utils/_compression.py b/scrapy/utils/_compression.py
+index 6b09f36ff0d..0a8191cc69c 100644
+--- a/scrapy/utils/_compression.py
++++ b/scrapy/utils/_compression.py
+@@ -1,42 +1,9 @@
+ import contextlib
+ import zlib
+ from io import BytesIO
+-from warnings import warn
+-
+-from scrapy.exceptions import ScrapyDeprecationWarning
+-
+-try:
+-    try:
+-        import brotli
+-    except ImportError:
+-        import brotlicffi as brotli
+-except ImportError:
+-    pass
+-else:
+-    try:
+-        brotli.Decompressor.process
+-    except AttributeError:
+-        warn(
+-            (
+-                "You have brotlipy installed, and Scrapy will use it, but "
+-                "Scrapy support for brotlipy is deprecated and will stop "
+-                "working in a future version of Scrapy. brotlipy itself is "
+-                "deprecated, it has been superseded by brotlicffi. Please, "
+-                "uninstall brotlipy and install brotli or brotlicffi instead. "
+-                "brotlipy has the same import name as brotli, so keeping both "
+-                "installed is strongly discouraged."
+-            ),
+-            ScrapyDeprecationWarning,
+-        )
+-
+-        def _brotli_decompress(decompressor, data):
+-            return decompressor.decompress(data)
+-
+-    else:
+-
+-        def _brotli_decompress(decompressor, data):
+-            return decompressor.process(data)
+ 
++with contextlib.suppress(ImportError):
++    import brotli
+ 
+ with contextlib.suppress(ImportError):
+     import zstandard
+@@ -46,62 +13,64 @@ def _brotli_decompress(decompressor, data):
+ 
+ 
+ class _DecompressionMaxSizeExceeded(ValueError):
+-    pass
++    def __init__(self, decompressed_size: int, max_size: int) -> None:
++        self.decompressed_size = decompressed_size
++        self.max_size = max_size
++
++    def __str__(self) -> str:
++        return (
++            f"The number of bytes decompressed so far "
++            f"({self.decompressed_size} B) exceeded the specified maximum "
++            f"({self.max_size} B)."
++        )
++
++
++def _check_max_size(decompressed_size: int, max_size: int) -> None:
++    if max_size and decompressed_size > max_size:
++        raise _DecompressionMaxSizeExceeded(decompressed_size, max_size)
+ 
+ 
+ def _inflate(data: bytes, *, max_size: int = 0) -> bytes:
+     decompressor = zlib.decompressobj()
+-    raw_decompressor = zlib.decompressobj(wbits=-15)
+-    input_stream = BytesIO(data)
++    try:
++        first_chunk = decompressor.decompress(data, max_length=_CHUNK_SIZE)
++    except zlib.error:
++        # to work with raw deflate content that may be sent by microsoft servers.
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-2qfp-q593-8484", "package": "brotli", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

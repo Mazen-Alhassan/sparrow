@@ -1,0 +1,235 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-27jp-wm6q-gp25 (none)
+Package: sqlparse 0.4.4
+Fixed in: 0.5.4
+Severity: moderate
+
+Summary: sqlparse: formatting list of tuples leads to denial of service
+
+Details:
+### Summary
+The below gist hangs while attempting to format a long list of tuples.
+
+This was found while [drafting a regression test for Dja
+ngo 5.2's composite primary key feature](https://code.djangoproject.com/ticket/36416#comment:3), which allows querying composite fields with tuples.
+
+###
+
+References:
+- WEB: https://github.com/andialbrecht/sqlparse/security/advisories/GHSA-27jp-wm6q-gp25
+- WEB: https://github.com/andialbrecht/sqlparse/commit/40ed3aa958657fa4a82055927fa9de70ab903360
+- PACKAGE: https://github.com/andialbrecht/sqlparse
+- WEB: https://github.com/andialbrecht/sqlparse/releases/tag/0.5.4
+
+Fix commit, Python hunks only:
+--- https://github.com/andialbrecht/sqlparse/commit/40ed3aa958657fa4a82055927fa9de70ab903360.patch ---
+diff --git a/sqlparse/engine/grouping.py b/sqlparse/engine/grouping.py
+index a63f4da2..f4151801 100644
+--- a/sqlparse/engine/grouping.py
++++ b/sqlparse/engine/grouping.py
+@@ -9,16 +9,35 @@
+ from sqlparse import tokens as T
+ from sqlparse.utils import recurse, imt
+ 
++# Maximum recursion depth for grouping operations to prevent DoS attacks
++# Set to None to disable limit (not recommended for untrusted input)
++MAX_GROUPING_DEPTH = 100
++
++# Maximum number of tokens to process in one grouping operation to prevent
++# DoS attacks.
++# Set to None to disable limit (not recommended for untrusted input)
++MAX_GROUPING_TOKENS = 10000
++
+ T_NUMERICAL = (T.Number, T.Number.Integer, T.Number.Float)
+ T_STRING = (T.String, T.String.Single, T.String.Symbol)
+ T_NAME = (T.Name, T.Name.Placeholder)
+ 
+ 
+-def _group_matching(tlist, cls):
++def _group_matching(tlist, cls, depth=0):
+     """Groups Tokens that have beginning and end."""
++    if MAX_GROUPING_DEPTH is not None and depth > MAX_GROUPING_DEPTH:
++        return
++
++    # Limit the number of tokens to prevent DoS attacks
++    if MAX_GROUPING_TOKENS is not None \
++       and len(tlist.tokens) > MAX_GROUPING_TOKENS:
++        return
++
+     opens = []
+     tidx_offset = 0
+-    for idx, token in enumerate(list(tlist)):
++    token_list = list(tlist)
++
++    for idx, token in enumerate(token_list):
+         tidx = idx - tidx_offset
+ 
+         if token.is_whitespace:
+@@ -31,7 +50,7 @@ def _group_matching(tlist, cls):
+             # Check inside previously grouped (i.e. parenthesis) if group
+             # of different type is inside (i.e., case). though ideally  should
+             # should check for all open/close tokens at once to avoid recursion
+-            _group_matching(token, cls)
++            _group_matching(token, cls, depth + 1)
+             continue
+ 
+         if token.match(*cls.M_OPEN):
+@@ -456,13 +475,23 @@ def _group(tlist, cls, match,
+            valid_next=lambda t: True,
+            post=None,
+            extend=True,
+-           recurse=True
++           recurse=True,
++           depth=0
+            ):
+     """Groups together tokens that are joined by a middle token. i.e. x < y"""
++    if MAX_GROUPING_DEPTH is not None and depth > MAX_GROUPING_DEPTH:
++        return
++
++    # Limit the number of tokens to prevent DoS attacks
++    if MAX_GROUPING_TOKENS is not None \
++       and len(tlist.tokens) > MAX_GROUPING_TOKENS:
++        return
+ 
+     tidx_offset = 0
+     pidx, prev_ = None, None
+-    for idx, token in enumerate(list(tlist)):
++    token_list = list(tlist)
++
++    for idx, token in enumerate(token_list):
+         tidx = idx - tidx_offset
+         if tidx < 0:  # tidx shouldn't get negative
+             continue
+@@ -471,7 +500,8 @@ def _group(tlist, cls, match,
+             continue
+ 
+         if recurse and token.is_group and not isinstance(token, cls):
+-            _group(token, cls, match, valid_prev, valid_next, post, extend)
++            _group(token, cls, match, valid_prev, valid_next,
++                   post, extend, True, depth + 1)
+ 
+         if match(token):
+             nidx, next_ = tlist.token_next(tidx)
+diff --git a/tests/test_dos_prevention.py b/tests/test_dos_prevention.py
+index 00000000..22eb1eaa
+--- /dev/null
++++ b/tests/test_dos_prevention.py
+@@ -0,0 +1,101 @@
++"""Tests for DoS prevention mechanisms in sqlparse."""
++
++import pytest
++import sqlparse
++import time
++
++
++class TestDoSPrevention:
++    """Test cases to ensure sqlparse is protected against DoS attacks."""
++
++    def test_large_tuple_list_performance(self):
++        """Test that parsing a large list of tuples doesn't cause DoS."""
++        # Generate SQL with many tuples (like Django composite primary key queries)
++        sql = '''
++        SELECT "composite_pk_comment"."tenant_id", "composite_pk_comment"."comment_id"
++        FROM "composite_pk_comment"
++        WHERE ("composite_pk_comment"."tenant_id", "composite_pk_comment"."comment_id") IN ('''
++
++        # Generate 5000 tuples - this would previously cause a hang
++        tuples = []
++        for i in range(1, 5001):
++            tuples.append(f"(1, {i})")
++
++        sql += ", ".join(tuples) + ")"
++
++        # Test should complete quickly (under 5 seconds)
++        start_time = time.time()
++        result = sqlparse.format(sql, reindent=True, keyword_case="upper")
++        execution_time = time.time() - start_time
++
++        assert execution_time < 5.0, f"Parsing took too long: {execution_time:.2f}s"
++        assert len(result) > 0, "Result should not be empty"
++        assert "SELECT" in result.upper(), "SQL should be properly formatted"
++
++    def test_deeply_nested_groups_limited(self):
++        """Test that deeply nested groups don't cause stack overflow."""
++        # Create deeply nested parentheses
++        sql = "SELECT " + "(" * 200 + "1" + ")" * 200
++
++        # Should not raise RecursionError
++        result = sqlparse.format(sql, reindent=True)
++        assert "SELECT" in result
++        assert "1" in result
++
++    def test_very_large_token_list_limited(self):
++        """Test that very large token lists are handled gracefully."""
++        # Create a SQL with many identifiers
++        identifiers = []
++        for i in range(15000):  # More than MAX_GROUPING_TOKENS
++            identifiers.append(f"col{i}")
++
++        sql = f"SELECT {', '.join(identifiers)} FROM table1"
++
++        # Should complete without hanging
++        start_time = time.time()
++        result = sqlparse.format(sql, reindent=True)
++        execution_time = time.time() - start_time
++
++        assert execution_time < 10.0, f"Parsing took too long: {execution_time:.2f}s"
++        assert "SELECT" in result
++        assert "FROM" in result
++
++    def test_normal_sql_still_works(self):
++        """Test that normal SQL still works correctly after DoS protections."""
++        sql = """
++        SELECT u.id, u.name, p.title
++        FROM users u
++        JOIN posts p ON u.id = p.user_id
++        WHERE u.active = 1
++        AND p.published_at > '2023-01-01'
++        ORDER BY p.published_at DESC
++        """
++
++        result = sqlparse.format(sql, reindent=True, keyword_case="upper")
++
++        assert "SELECT" in result
++        assert "FROM" in result
++        assert "JOIN" in result
++        assert "WHERE" in result
++        assert "ORDER BY" in result
++
++    def test_reasonable_tuple_list_works(self):
++        """Test that reasonable-sized tuple lists still work correctly."""
++        sql = '''
++        SELECT id FROM table1
++        WHERE (col1, col2) IN ('''
++
++        # 100 tuples should work fine
++        tuples = []
++        for i in range(1, 101):
++            tuples.append(f"({i}, {i * 2})")
++
++        sql += ", ".join(tuples) + ")"
++
++        result = sqlparse.format(sql, reindent=True, keyword_case="upper")
++
++        assert "SELECT" in result
++        assert "WHERE" in result
++        assert "IN" in result
++        assert "1," in result  # First tuple should be there
++        assert "200" in result  # Last tuple should be there
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-27jp-wm6q-gp25", "package": "sqlparse", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

@@ -1,0 +1,34 @@
+{
+  "advisory": "GHSA-3496-9g83-7v6x",
+  "package": "sqlparse",
+  "sinks": [
+    "sqlparse.filters.output.OutputPythonFilter._process",
+    "sqlparse.filters.output.OutputPHPFilter._process"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 53ff44b changes the quote escaping in both _process methods in sqlparse/filters/output.py",
+  "assumptions": [
+    "assumes both output filters are separate sinks rather than one shared helper"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "sqlparse.filters.output.OutputPythonFilter._process": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.4.4",
+      "fixed_version": "0.6.0",
+      "note": "body differs between 0.4.4 and 0.6.0",
+      "location": "sqlparse.filters.output:OutputPythonFilter._process"
+    },
+    "sqlparse.filters.output.OutputPHPFilter._process": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.4.4",
+      "fixed_version": "0.6.0",
+      "note": "body differs between 0.4.4 and 0.6.0",
+      "location": "sqlparse.filters.output:OutputPHPFilter._process"
+    }
+  }
+}

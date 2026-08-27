@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-2qfp-q593-8484",
+  "package": "brotli",
+  "sinks": [],
+  "confidence": "medium",
+  "evidence": "the mitigation is a new max_output_length argument on Decompressor.process, which lives in the _brotli C extension, and the Python package only re-exports it",
+  "assumptions": [
+    "assumes brotli.Decompressor is defined in the C extension in 1.0.9, so no Python function can be named as a sink",
+    "the advisory is really about scrapy's use of brotli, not about a Python function in brotli itself"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

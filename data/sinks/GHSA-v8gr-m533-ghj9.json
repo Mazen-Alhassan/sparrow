@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-v8gr-m533-ghj9",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the linked commit only bumps __version__; the advisory is about the statically linked OpenSSL inside the wheels",
+  "assumptions": [
+    "assumes a bundled-binary advisory has no Python sink"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

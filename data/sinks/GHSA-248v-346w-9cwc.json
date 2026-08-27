@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-248v-346w-9cwc",
+  "package": "certifi",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the fix commit only removes a root certificate from cacert.pem and bumps __version__; no Python function changed",
+  "assumptions": [
+    "assumes a data-only change has no function-level sink, so reachability cannot be decided at function granularity for this advisory"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

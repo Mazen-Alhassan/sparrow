@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-jm77-qphf-c4w8",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the advisory is about the statically linked OpenSSL inside the published wheels; the linked commits only bump the vendored version",
+  "assumptions": [
+    "assumes a bundled-binary advisory has no Python sink"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

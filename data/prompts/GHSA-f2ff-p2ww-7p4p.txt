@@ -1,0 +1,195 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-f2ff-p2ww-7p4p (CVE-2026-71491)
+Package: sqlparse 0.4.4
+Fixed in: 0.6.0
+Severity: high
+
+Summary: sqlparse: Quadratic O(n²) DoS in group_comments
+
+Details:
+### Summary
+A comment-only statement (`-- c\n`*n) may cause a Denial of Service (DoS).
+
+### Details
+Location: [sqlparse/engine/grouping.py:331-341](https://github.com/andialbrecht/sqlparse/blob/f80af6a4007f11ada847218df8c29dc859238290/sqlparse/engine/grouping.py#L332) (`group_comments`), invoked first in `group()` at `grouping.py:439`. Reachable via `sqlparse.parse()` and `sqlparse.format(sql, strip_comments=True)`.
+
+A statement made of many single-line comments (`'-- c\n'` repeated) lexes in O(n) but `group_comments` is O(n²):
+
+```python
+def group_comments(tlist):
+    tidx, token = tlist.token_next_by(t=T.Comment)
+    while token:
+        eidx, end = tlist.token_not_matching(
+            lambda tk: imt(tk, t=T.Comment) or tk.is_newline, idx=tidx)
+        ...
+        tidx, token = tlist.token_next_by(t=T.Comment, idx=tidx)
+```
+
+The `while` loop runs n times and each `token_next_by` / `token_not_matching` rescans the O(n) remaining tokens. When all tokens are comments/newlines nothing ever groups, yet the full scan is repeated per token.
+
+Two following factors increase the severity:
+
+1. `group_comments` runs first in `group()` (`grouping.py:439`), before the `_group_matching` token-count guard (`grouping.py:34-39`). So the entire quadratic cost is paid even on oversized input. `MAX_GROUPING_TOKENS` does not provide protection on this vector.
+2. It sits on the primary sanitizer path: `format(sql, strip_comments=True)`, used by query loggers, SQL firewalls, ORMs, and migration tools.
+
+### PoC
+Tested using Python 3.14:
+
+```python
+import time, sqlparse
+for n in (1000, 2000, 4000):
+    s = "-- c\n" * n
+    t = time.perf_counter()
+    sqlparse.format(s, strip_comments=True)
+    print(f"n={n:5d}  format(strip_comments)={1000*(time.perf_counter()-t):7.1f} ms")
+```
+
+Output:
+
+```
+n= 1000  format(strip_comments)=  106.0 ms
+n= 2000  format(strip_comments)=  403.3 ms
+n= 4000  format(strip_comments)= 1602.8 ms
+```
+
+Time increase of ~4× per 2× input (quadratic). `parse()` shows the identical curve. Instrumented scan counts are exactly 1.0M / 4.0M / 16.0M tokens for n=1000/2000/4000. A ~250 KB comment-only payload forces minutes of CPU regardless of the 10000 token cap.
+
+### Impact
+Denial of Service
+
+References:
+- WEB: https://github.com/andialbrecht/sqlparse/security/advisories/GHSA-f2ff-p2ww-7p4p
+- WEB: https://github.com/andialbrecht/sqlparse/commit/ef2012a5eeb491e604dea2b00d516904a3830c87
+- PACKAGE: https://github.com/andialbrecht/sqlparse
+
+Fix commit, Python hunks only:
+--- https://github.com/andialbrecht/sqlparse/commit/ef2012a5eeb491e604dea2b00d516904a3830c87.patch ---
+diff --git a/benchmarks/validate_group_comments_dos.py b/benchmarks/validate_group_comments_dos.py
+index 00000000..58b3e014
+--- /dev/null
++++ b/benchmarks/validate_group_comments_dos.py
+@@ -0,0 +1,85 @@
++"""Validate that ``group_comments`` scales linearly on comment-only input.
++
++Regression check for the quadratic O(n^2) DoS in ``group_comments``
++(sqlparse/engine/grouping.py), reported as GHSA-f2ff-p2ww-7p4p.
++
++A statement made only of single-line comments (``'-- c\\n'`` repeated n times)
++lexes in O(n) but ``group_comments`` rescans the O(n) remaining tokens for every
++comment token, giving O(n^2) total work. ``group_comments`` runs first in
++``group()``, before the ``MAX_GROUPING_TOKENS`` guard, so the token cap does not
++protect this vector. The path is reachable via ``sqlparse.parse()`` and
++``sqlparse.format(sql, strip_comments=True)``.
++
++This script measures the scaling of the vulnerable path and reports whether the
++observed growth is quadratic (vulnerable) or roughly linear (patched).
++
++Run with:  python benchmarks/validate_group_comments_dos.py
++
++Exit code 0 => behaviour looks linear (advisory mitigated).
++Exit code 1 => behaviour looks quadratic (advisory reproduced).
++"""
++
++import sys
++import time
++
++import sqlparse
++
++
++def payload(n):
++    """A comment-only statement of n single-line comments."""
++    return '-- c\n' * n
++
++
++def measure(fn, sql):
++    t0 = time.perf_counter()
++    fn(sql)
++    return (time.perf_counter() - t0) * 1000
++
++
++def run(label, fn):
++    print(f'{label}:')
++    sizes = (1000, 2000, 4000, 8000)
++    timings = []
++    for n in sizes:
++        dt = measure(fn, payload(n))
++        timings.append(dt)
++        print(f'  n={n:5d}  {dt:8.1f} ms  ({len(payload(n))} B)')
++
++    # For each doubling of the input, quadratic growth ~4x, linear ~2x.
++    ratios = [b / a for a, b in zip(timings, timings[1:]) if a > 0]
++    print(f'  doubling ratios: {", ".join(f"{r:.2f}x" for r in ratios)}')
++    return ratios
++
++
++def classify(ratios):
++    """Quadratic if the average per-doubling ratio is closer to 4x than 2x."""
++    if not ratios:
++        return 'inconclusive', 0.0
++    avg = sum(ratios) / len(ratios)
++    # Midpoint between linear (2x) and quadratic (4x) is 3x.
++    return ('quadratic' if avg >= 3.0 else 'linear'), avg
++
++
++def main():
++    print('GHSA-f2ff-p2ww-7p4p: quadratic DoS in group_comments\n')
++
++    all_ratios = []
++    all_ratios += run('sqlparse.parse', sqlparse.parse)
++    print()
++    all_ratios += run(
++        'sqlparse.format(strip_comments=True)',
++        lambda s: sqlparse.format(s, strip_comments=True),
++    )
++    print()
++
++    verdict, avg = classify(all_ratios)
++    print(f'Average doubling ratio: {avg:.2f}x  =>  {verdict}')
++    if verdict == 'quadratic':
++        print('VULNERABLE: growth is quadratic, advisory reproduced.')
++        return 1
++    print('OK: growth is roughly linear, advisory mitigated.')
++    return 0
++
++
++if __name__ == '__main__':
++    sys.exit(main())
+diff --git a/sqlparse/engine/grouping.py b/sqlparse/engine/grouping.py
+index a8300918..d8cfa9e1 100644
+--- a/sqlparse/engine/grouping.py
++++ b/sqlparse/engine/grouping.py
+@@ -334,9 +334,14 @@ def group_comments(tlist):
+     while token:
+         eidx, end = tlist.token_not_matching(
+             lambda tk: imt(tk, t=T.Comment) or tk.is_newline, idx=tidx)
+-        if end is not None:
+-            eidx, end = tlist.token_prev(eidx, skip_ws=False)
+-            tlist.group_tokens(sql.Comment, tidx, eidx)
++        if end is None:
++            # From tidx onward everything is comment/newline: there is no
++            # terminator to group against, and every later start would hit
++            # the same dead end. Stop instead of re-scanning the tail once
++            # per remaining comment token (which is O(n**2)).
++            break
++        eidx, end = tlist.token_prev(eidx, skip_ws=False)
++        tlist.group_tokens(sql.Comment, tidx, eidx)
+ 
+         tidx, token = tlist.token_next_by(t=T.Comment, idx=tidx)
+ 
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-f2ff-p2ww-7p4p", "package": "sqlparse", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

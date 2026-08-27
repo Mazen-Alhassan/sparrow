@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-3ww4-gg4f-jr7f",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked, and the Bleichenbacher oracle is in the RSA PKCS1v15 decryption path implemented in the compiled OpenSSL binding",
+  "assumptions": [
+    "assumes the flaw is below the Python layer, so no Python function can be named",
+    "the Python entry point is RSAPrivateKey.decrypt, which is an abstract method in cryptography.hazmat.primitives.asymmetric.rsa and would verify as unchanged"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

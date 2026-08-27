@@ -1,0 +1,51 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-248v-346w-9cwc (CVE-2024-39689, GHSA-248v-346w-9cwc, PYSEC-2024-230)
+Package: certifi 2023.7.22
+Fixed in: 2024.7.4
+Severity: low
+
+Summary: Certifi removes GLOBALTRUST root certificate
+
+Details:
+Certifi 2024.07.04 removes root certificates from "GLOBALTRUST" from the root store. These are in the process of being removed from Mozilla's trust store.
+
+GLOBALTRUST's root certificates are being removed pursuant to an investigation which identified "long-running and unresolved compliance issues". Conclusions of Mozilla's investigation can be found [here]( https://groups.google.com/a/mozilla.org/g/dev-security-policy/c/XpknYMPO8dI).
+
+References:
+- WEB: https://github.com/certifi/python-certifi/security/advisories/GHSA-248v-346w-9cwc
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-39689
+- WEB: https://github.com/certifi/python-certifi/commit/bd8153872e9c6fc98f4023df9c2deaffea2fa463
+- PACKAGE: https://github.com/certifi/python-certifi
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/certifi/PYSEC-2024-230.yaml
+- WEB: https://groups.google.com/a/mozilla.org/g/dev-security-policy/c/XpknYMPO8dI
+- WEB: https://security.netapp.com/advisory/ntap-20241206-0001
+
+Fix commit, Python hunks only:
+--- https://github.com/certifi/python-certifi/commit/bd8153872e9c6fc98f4023df9c2deaffea2fa463.patch ---
+diff --git a/certifi/__init__.py b/certifi/__init__.py
+index 62b27b63..d321f1bc 100644
+--- a/certifi/__init__.py
++++ b/certifi/__init__.py
+@@ -1,4 +1,4 @@
+ from .core import contents, where
+ 
+ __all__ = ["contents", "where"]
+-__version__ = "2024.06.02"
++__version__ = "2024.07.04"
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-248v-346w-9cwc", "package": "certifi", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

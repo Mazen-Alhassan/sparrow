@@ -1,0 +1,26 @@
+{
+  "advisory": "GHSA-3rq5-2g8h-59hc",
+  "package": "dnspython",
+  "sinks": [
+    "dns.query.udp"
+  ],
+  "confidence": "medium",
+  "evidence": "the linked eventlet commit adds an ignore_errors loop to its greendns copy of dns.query.udp, and the dnspython commit makes the same change upstream",
+  "assumptions": [
+    "the shown diff is eventlet's vendored copy, so the dnspython function name was inferred rather than read",
+    "dns.asyncquery.udp carries the same change and was not included",
+    "assumes 2.1.0 has the same udp signature as the version the fix was written against"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "dns.query.udp": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.1.0",
+      "fixed_version": "2.6.1",
+      "note": "body differs between 2.1.0 and 2.6.1",
+      "location": "dns.query:udp"
+    }
+  }
+}

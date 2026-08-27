@@ -1,0 +1,46 @@
+{
+  "advisory": "GHSA-2xpw-w6gg-jr37",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.response.HTTPResponse.read",
+    "urllib3.response.GzipDecoder.decompress",
+    "urllib3.response.DeflateDecoder.decompress"
+  ],
+  "confidence": "medium",
+  "evidence": "fix commit c19571d adds a max_length argument to ContentDecoder.decompress and to the read path in src/urllib3/response.py",
+  "assumptions": [
+    "the fix is written against the 2.x layout and this pin is 1.26.6, so the function names were mapped by hand",
+    "assumes the 1.26 decoders and HTTPResponse.read carry the same flaw",
+    "ContentDecoder.decompress in 1.26 is an abstract stub, so the concrete decoders were named instead"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.response.HTTPResponse.read": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.6.0",
+      "note": "body differs between 1.26.6 and 2.6.0",
+      "location": "urllib3.response:HTTPResponse.read"
+    },
+    "urllib3.response.GzipDecoder.decompress": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.6.0",
+      "note": "body differs between 1.26.6 and 2.6.0",
+      "location": "urllib3.response:GzipDecoder.decompress"
+    },
+    "urllib3.response.DeflateDecoder.decompress": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.6.0",
+      "note": "body differs between 1.26.6 and 2.6.0",
+      "location": "urllib3.response:DeflateDecoder.decompress"
+    }
+  }
+}

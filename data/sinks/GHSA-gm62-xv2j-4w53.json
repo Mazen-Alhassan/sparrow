@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-gm62-xv2j-4w53",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.response.MultiDecoder.__init__"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 24d7b67 adds a max_decode_links check to MultiDecoder.__init__ in src/urllib3/response.py",
+  "assumptions": [
+    "the fix targets the 2.x tree while this pin is 1.26.6, where MultiDecoder exists with the same constructor"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.response.MultiDecoder.__init__": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.6.0",
+      "note": "body differs between 1.26.6 and 2.6.0",
+      "location": "urllib3.response:MultiDecoder.__init__"
+    }
+  }
+}

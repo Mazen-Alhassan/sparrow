@@ -1,0 +1,36 @@
+{
+  "advisory": "GHSA-jfmj-5v4g-7637",
+  "package": "zipp",
+  "sinks": [
+    "zipp.Path.iterdir",
+    "zipp.CompleteDirs.namelist"
+  ],
+  "confidence": "medium",
+  "evidence": "fix commit fd604bd adds a SanitizedNames mix-in whose namelist sanitises entries, which changes what Path.iterdir walks",
+  "assumptions": [
+    "SanitizedNames is new in the fix so the pre-existing namelist implementation on CompleteDirs was named instead",
+    "the infinite loop is in the Path traversal, and iterdir is the function the advisory names",
+    "joinpath and __truediv__ are equally valid sinks and were not included"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "zipp.Path.iterdir": {
+      "status": "unchanged_in_fixed",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": false,
+      "vulnerable_version": "3.15.0",
+      "fixed_version": "3.19.1",
+      "note": "identical body in 3.15.0 and 3.19.1",
+      "location": "zipp:Path.iterdir"
+    },
+    "zipp.CompleteDirs.namelist": {
+      "status": "unchanged_in_fixed",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": false,
+      "vulnerable_version": "3.15.0",
+      "fixed_version": "3.19.1",
+      "note": "identical body in 3.15.0 and 3.19.1",
+      "location": "zipp:CompleteDirs.namelist"
+    }
+  }
+}

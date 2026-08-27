@@ -1,0 +1,34 @@
+{
+  "advisory": "GHSA-pq67-6m6q-mj2v",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.poolmanager.PoolManager.__init__",
+    "urllib3.poolmanager.PoolManager.urlopen"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit f05b132 adds retries normalisation to PoolManager.__init__ and makes urlopen fall back to response.retries",
+  "assumptions": [
+    "the fix targets the 2.x tree while this pin is 1.26.6, where both functions exist with the same names"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.poolmanager.PoolManager.__init__": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.5.0",
+      "note": "body differs between 1.26.6 and 2.5.0",
+      "location": "urllib3.poolmanager:PoolManager.__init__"
+    },
+    "urllib3.poolmanager.PoolManager.urlopen": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "2.5.0",
+      "note": "body differs between 1.26.6 and 2.5.0",
+      "location": "urllib3.poolmanager:PoolManager.urlopen"
+    }
+  }
+}

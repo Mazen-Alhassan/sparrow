@@ -1,0 +1,26 @@
+{
+  "advisory": "GHSA-p8q5-cvwx-wvwp",
+  "package": "flask-appbuilder",
+  "sinks": [
+    "flask_appbuilder.security.manager.BaseSecurityManager.auth_user_db"
+  ],
+  "confidence": "low",
+  "evidence": "no fix commit is linked; the timing discrepancy is in the database auth path that skips password hashing when the user does not exist",
+  "assumptions": [
+    "the function name was inferred from the described behaviour, not from a diff",
+    "the class name in 4.3.10 may differ",
+    "the fix may be a dummy hash call added elsewhere"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "flask_appbuilder.security.manager.BaseSecurityManager.auth_user_db": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "4.3.10",
+      "fixed_version": "4.5.3",
+      "note": "body differs between 4.3.10 and 4.5.3",
+      "location": "flask_appbuilder.security.manager:BaseSecurityManager.auth_user_db"
+    }
+  }
+}

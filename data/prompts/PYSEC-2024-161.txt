@@ -1,0 +1,46 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory PYSEC-2024-161 (CVE-2024-52338)
+Package: pyarrow 14.0.1
+Fixed in: 17.0.0, 801de2fbcf5bcbce0c019ed4b35ff3fc863b141b
+Severity: unknown
+
+Summary: (none)
+
+Details:
+Deserialization of untrusted data in IPC and Parquet readers in the Apache Arrow R package versions 4.0.0 through 16.1.0 allows arbitrary code execution. An application is vulnerable if it 
+reads Arrow IPC, Feather or Parquet data from untrusted sources (for 
+example, user-supplied input files). This vulnerability only affects the arrow R package, not other Apache Arrow 
+implementations or bindings unless those bindings are specifically used via the R package (for example, an R application that embeds a Python interpreter and uses PyArrow to read files from untrusted sources is still vulnerable if the arrow R package is an affected version). It is recommended that users of the arrow R package upgrade to 17.0.0 or later. Similarly, it
+ is recommended that downstream libraries upgrade their dependency 
+requirements to arrow 17.0.0 or later. If using an affected
+version of the package, untrusted data can read into a Table and its internal to_data_frame() method can be used as a workaround (e.g., read_parquet(..., as_data_frame = FALSE)$to_data_frame()).
+
+
+This issue affects the Apache Arrow R package: from 4.0.0 through 16.1.0.
+
+
+Users are recommended to upgrade to version 17.0.0, which fixes the issue.
+
+References:
+- FIX: https://github.com/apache/arrow/commit/801de2fbcf5bcbce0c019ed4b35ff3fc863b141b
+- WEB: https://lists.apache.org/thread/0rcbvj1gdp15lvm23zm601tjpq0k25vt
+- WEB: http://www.openwall.com/lists/oss-security/2024/11/28/3
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "PYSEC-2024-161", "package": "pyarrow", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

@@ -1,0 +1,35 @@
+{
+  "advisory": "GHSA-jjg7-2v4v-x38h",
+  "package": "idna",
+  "sinks": [
+    "idna.core.encode",
+    "idna.core.alabel"
+  ],
+  "confidence": "medium",
+  "evidence": "the linked commit only bumps __version__ in package_data.py, so the function was taken from the advisory, which names idna.encode()",
+  "assumptions": [
+    "the real fix commit is not linked, so the sink was inferred from the advisory text",
+    "alabel was included because the length rejection was added to the per-label path, and it may not have changed"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "idna.core.encode": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.2",
+      "fixed_version": "3.7",
+      "note": "body differs between 3.2 and 3.7",
+      "location": "idna.core:encode"
+    },
+    "idna.core.alabel": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.2",
+      "fixed_version": "3.7",
+      "note": "body differs between 3.2 and 3.7",
+      "location": "idna.core:alabel"
+    }
+  }
+}

@@ -1,0 +1,123 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-38jv-5279-wg99 (CVE-2026-21441, GHSA-38jv-5279-wg99, PYSEC-2026-1996)
+Package: urllib3 1.26.6
+Fixed in: 2.6.3
+Severity: high
+
+Summary: Decompression-bomb safeguards bypassed when following HTTP redirects (streaming API)
+
+Details:
+### Impact
+
+urllib3's [streaming API](https://urllib3.readthedocs.io/en/2.6.2/advanced-usage.html#streaming-and-i-o) is designed for the efficient handling of large HTTP responses by reading the content in chunks, rather than loading the entire response body into memory at once.
+
+urllib3 can perform decoding or decompression based on the HTTP `Content-Encoding` header (e.g., `gzip`, `deflate`, `br`, or `zstd`). When using the streaming API, the library decompresses only the necessary bytes, enabling partial content consumption.
+
+However, for HTTP redirect responses, the library would read the entire response body to drain the connection and decompress the content unnecessarily. This decompression occurred even before any read methods were called, and configured read limits did not restrict the amount of decompressed data. As a result, there was no safeguard against decompression bombs. A malicious server could exploit this to trigger excessive resource consumption on the client (high CPU usage and large memory allocations for decompressed data; CWE-409).
+
+### Affected usages
+
+Applications and libraries using urllib3 version 2.6.2 and earlier to stream content from untrusted sources by setting `preload_content=False` when they do not disable redirects.
+
+
+### Remediation
+
+Upgrade to at least urllib3 v2.6.3 in which the library does not decode content of redirect responses when `preload_content=False`.
+
+If upgrading is not immediately possible, disable [redirects](https://urllib3.readthedocs.io/en/2.6.2/user-guide.html#retrying-requests) by setting `redirect=False` for requests to untrusted source.
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-38jv-5279-wg99
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-21441
+- WEB: https://github.com/urllib3/urllib3/commit/8864ac407bba8607950025e0979c4c69bc7abc7b
+- PACKAGE: https://github.com/urllib3/urllib3
+- WEB: https://lists.debian.org/debian-lts-announce/2026/01/msg00017.html
+
+Fix commit, Python hunks only:
+--- https://github.com/urllib3/urllib3/commit/8864ac407bba8607950025e0979c4c69bc7abc7b.patch ---
+diff --git a/dummyserver/app.py b/dummyserver/app.py
+index 0eeb93f739..5b82e9329d 100644
+--- a/dummyserver/app.py
++++ b/dummyserver/app.py
+@@ -233,10 +233,16 @@ async def redirect() -> ResponseReturnValue:
+     values = await request.values
+     target = values.get("target", "/")
+     status = values.get("status", "303 See Other")
++    compressed = values.get("compressed") == "true"
+     status_code = status.split(" ")[0]
+ 
+     headers = [("Location", target)]
+-    return await make_response("", status_code, headers)
++    if compressed:
++        headers.append(("Content-Encoding", "gzip"))
++        data = gzip.compress(b"foo")
++    else:
++        data = b""
++    return await make_response(data, status_code, headers)
+ 
+ 
+ @hypercorn_app.route("/redirect_after")
+diff --git a/src/urllib3/response.py b/src/urllib3/response.py
+index f6266f1a93..ff6d1f4911 100644
+--- a/src/urllib3/response.py
++++ b/src/urllib3/response.py
+@@ -797,7 +797,11 @@ def drain_conn(self) -> None:
+         Unread data in the HTTPResponse connection blocks the connection from being released back to the pool.
+         """
+         try:
+-            self.read()
++            self.read(
++                # Do not spend resources decoding the content unless
++                # decoding has already been initiated.
++                decode_content=self._has_decoded_content,
++            )
+         except (HTTPError, OSError, BaseSSLError, HTTPException):
+             pass
+ 
+diff --git a/test/with_dummyserver/test_connectionpool.py b/test/with_dummyserver/test_connectionpool.py
+index ce165e24a1..8d6107aea0 100644
+--- a/test/with_dummyserver/test_connectionpool.py
++++ b/test/with_dummyserver/test_connectionpool.py
+@@ -508,6 +508,25 @@ def test_redirect(self) -> None:
+             assert r.status == 200
+             assert r.data == b"Dummy server!"
+ 
++    @mock.patch("urllib3.response.GzipDecoder.decompress")
++    def test_no_decoding_with_redirect_when_preload_disabled(
++        self, gzip_decompress: mock.MagicMock
++    ) -> None:
++        """
++        Test that urllib3 does not attempt to decode a gzipped redirect
++        response when `preload_content` is set to `False`.
++        """
++        with HTTPConnectionPool(self.host, self.port) as pool:
++            # Three requests are expected: two redirects and one final / 200 OK.
++            response = pool.request(
++                "GET",
++                "/redirect",
++                fields={"target": "/redirect?compressed=true", "compressed": "true"},
++                preload_content=False,
++            )
++        assert response.status == 200
++        gzip_decompress.assert_not_called()
++
+     def test_303_redirect_makes_request_lose_body(self) -> None:
+         with HTTPConnectionPool(self.host, self.port) as pool:
+             response = pool.request(
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-38jv-5279-wg99", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

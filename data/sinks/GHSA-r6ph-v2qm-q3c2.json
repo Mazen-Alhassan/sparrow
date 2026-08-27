@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-r6ph-v2qm-q3c2",
+  "package": "cryptography",
+  "sinks": [
+    "cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicNumbers.public_key"
+  ],
+  "confidence": "medium",
+  "evidence": "fix commit 0eebb9d only deprecates the SECT curve classes in ec.py; the subgroup check itself is in the rust backend",
+  "assumptions": [
+    "the Python hunk shown is a deprecation, not the validation, so the sink was taken from the advisory naming public_key()",
+    "the real check may be entirely in rust, in which case this sink will fail verification"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicNumbers.public_key": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "41.0.2",
+      "fixed_version": "46.0.5",
+      "note": "removed in 46.0.5",
+      "location": "cryptography.hazmat.primitives.asymmetric.ec:EllipticCurvePublicNumbers.public_key"
+    }
+  }
+}

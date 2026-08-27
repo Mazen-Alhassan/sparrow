@@ -1,0 +1,34 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory PYSEC-2025-183 (CVE-2025-45768)
+Package: pyjwt 2.4.0
+Fixed in: unknown
+Severity: unknown
+
+Summary: (none)
+
+Details:
+pyjwt v2.10.1 was discovered to contain weak encryption. NOTE: this is disputed by the Supplier because the key length is chosen by the application that uses the library (admittedly, library users may benefit from a minimum value and a mechanism for opting in to strict enforcement).
+
+References:
+- WEB: https://github.com/jpadilla
+- REPORT: https://gist.github.com/ZupeiNie/6f65e564f2067b876321d3dfdbb76569
+- PACKAGE: https://github.com/jpadilla/pyjwt
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "PYSEC-2025-183", "package": "pyjwt", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

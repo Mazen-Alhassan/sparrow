@@ -1,0 +1,35 @@
+{
+  "advisory": "GHSA-9wx4-h78v-vm56",
+  "package": "requests",
+  "sinks": [
+    "requests.adapters.HTTPAdapter.send",
+    "requests.adapters.HTTPAdapter.get_connection"
+  ],
+  "confidence": "medium",
+  "evidence": "pull request 6655 adds _urllib3_request_context and _get_connection so the pool key includes cert_reqs, replacing the old get_connection path in src/requests/adapters.py",
+  "assumptions": [
+    "_get_connection and _urllib3_request_context are new in the fix, so they cannot exist in 2.31.0 and the pre-existing functions they replace were named instead",
+    "assumes get_connection in 2.31.0 is the function that ignores verify"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "requests.adapters.HTTPAdapter.send": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.31.0",
+      "fixed_version": "2.32.0",
+      "note": "body differs between 2.31.0 and 2.32.0",
+      "location": "requests.adapters:HTTPAdapter.send"
+    },
+    "requests.adapters.HTTPAdapter.get_connection": {
+      "status": "unchanged_in_fixed",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": false,
+      "vulnerable_version": "2.31.0",
+      "fixed_version": "2.32.0",
+      "note": "identical body in 2.31.0 and 2.32.0",
+      "location": "requests.adapters:HTTPAdapter.get_connection"
+    }
+  }
+}

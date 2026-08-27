@@ -1,0 +1,93 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-9hjg-9r4m-mvj7 (CVE-2024-47081, GHSA-9hjg-9r4m-mvj7, PYSEC-2026-1872)
+Package: requests 2.31.0
+Fixed in: 2.32.4
+Severity: moderate
+
+Summary: Requests vulnerable to .netrc credentials leak via malicious URLs
+
+Details:
+### Impact
+
+Due to a URL parsing issue, Requests releases prior to 2.32.4 may leak .netrc credentials to third parties for specific maliciously-crafted URLs.
+
+### Workarounds
+For older versions of Requests, use of the .netrc file can be disabled with `trust_env=False` on your Requests Session ([docs](https://requests.readthedocs.io/en/latest/api/#requests.Session.trust_env)).
+
+### References
+https://github.com/psf/requests/pull/6965
+https://seclists.org/fulldisclosure/2025/Jun/2
+
+References:
+- WEB: https://github.com/psf/requests/security/advisories/GHSA-9hjg-9r4m-mvj7
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-47081
+- WEB: https://github.com/psf/requests/pull/6965
+- WEB: https://github.com/psf/requests/commit/96ba401c1296ab1dda74a2365ef36d88f7d144ef
+- PACKAGE: https://github.com/psf/requests
+- WEB: https://requests.readthedocs.io/en/latest/api/#requests.Session.trust_env
+- WEB: https://seclists.org/fulldisclosure/2025/Jun/2
+- WEB: http://seclists.org/fulldisclosure/2025/Jun/2
+- WEB: http://www.openwall.com/lists/oss-security/2025/06/03/11
+- WEB: http://www.openwall.com/lists/oss-security/2025/06/03/9
+- WEB: http://www.openwall.com/lists/oss-security/2025/06/04/1
+- WEB: http://www.openwall.com/lists/oss-security/2025/06/04/6
+
+Fix commit, Python hunks only:
+--- https://github.com/psf/requests/pull/6965.diff ---
+diff --git a/src/requests/utils.py b/src/requests/utils.py
+index 699683e5d9..8a307ca8a0 100644
+--- a/src/requests/utils.py
++++ b/src/requests/utils.py
+@@ -236,13 +236,7 @@ def get_netrc_auth(url, raise_errors=False):
+             return
+ 
+         ri = urlparse(url)
+-
+-        # Strip port numbers from netloc. This weird `if...encode`` dance is
+-        # used for Python 3.2, which doesn't support unicode literals.
+-        splitstr = b":"
+-        if isinstance(url, str):
+-            splitstr = splitstr.decode("ascii")
+-        host = ri.netloc.split(splitstr)[0]
++        host = ri.hostname
+ 
+         try:
+             _netrc = netrc(netrc_path).authenticators(host)
+
+--- https://github.com/psf/requests/commit/96ba401c1296ab1dda74a2365ef36d88f7d144ef.patch ---
+diff --git a/src/requests/utils.py b/src/requests/utils.py
+index 699683e5d9..8a307ca8a0 100644
+--- a/src/requests/utils.py
++++ b/src/requests/utils.py
+@@ -236,13 +236,7 @@ def get_netrc_auth(url, raise_errors=False):
+             return
+ 
+         ri = urlparse(url)
+-
+-        # Strip port numbers from netloc. This weird `if...encode`` dance is
+-        # used for Python 3.2, which doesn't support unicode literals.
+-        splitstr = b":"
+-        if isinstance(url, str):
+-            splitstr = splitstr.decode("ascii")
+-        host = ri.netloc.split(splitstr)[0]
++        host = ri.hostname
+ 
+         try:
+             _netrc = netrc(netrc_path).authenticators(host)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-9hjg-9r4m-mvj7", "package": "requests", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

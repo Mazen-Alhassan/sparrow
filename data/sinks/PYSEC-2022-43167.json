@@ -1,0 +1,12 @@
+{
+  "advisory": "PYSEC-2022-43167",
+  "package": "selenium",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the advisory is about the Java Selenium Server (Grid), not about the Python client package",
+  "assumptions": [
+    "assumes no Python function in the selenium package is affected, since the vulnerable component is the Java server"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

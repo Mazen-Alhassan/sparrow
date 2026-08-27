@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-99pm-ch96-ccp2",
+  "package": "flask-appbuilder",
+  "sinks": [
+    "flask_appbuilder.utils.base.is_safe_redirect_url"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 32eedbb changes the safe host lookup inside is_safe_redirect_url in flask_appbuilder/utils/base.py",
+  "assumptions": [
+    "the shown diff only renames the config key, so the function may not exist at all in 4.3.10 and the real fix that introduced it is a different commit"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "flask_appbuilder.utils.base.is_safe_redirect_url": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "4.3.10",
+      "fixed_version": "4.6.2",
+      "note": "body differs between 4.3.10 and 4.6.2",
+      "location": "flask_appbuilder.utils.base:is_safe_redirect_url"
+    }
+  }
+}

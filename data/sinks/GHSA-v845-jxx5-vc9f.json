@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-v845-jxx5-vc9f",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.util.retry.Retry"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 0122035 adds Cookie to Retry.DEFAULT_REMOVE_HEADERS_ON_REDIRECT, a class attribute, so no function body changed",
+  "assumptions": [
+    "the sink is a class attribute, so the class node is named instead of a function",
+    "the code that acts on it is HTTPConnectionPool.urlopen, which the fix did not touch"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.util.retry.Retry": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "1.26.17",
+      "note": "body differs between 1.26.6 and 1.26.17",
+      "location": "urllib3.util.retry:Retry"
+    }
+  }
+}

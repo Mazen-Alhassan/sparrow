@@ -1,0 +1,36 @@
+{
+  "advisory": "GHSA-65pc-fj4g-8rjx",
+  "package": "idna",
+  "sinks": [
+    "idna.core.encode",
+    "idna.core.valid_contexto"
+  ],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked; the advisory names idna.encode() as the entry point and valid_contexto as the function that runs before the length check",
+  "assumptions": [
+    "function names come from the advisory prose, not from a diff",
+    "assumes both live in idna.core in 3.2",
+    "the fix is a length check added in encode, so valid_contexto itself may be unchanged"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "idna.core.encode": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.2",
+      "fixed_version": "3.15",
+      "note": "body differs between 3.2 and 3.15",
+      "location": "idna.core:encode"
+    },
+    "idna.core.valid_contexto": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.2",
+      "fixed_version": "3.15",
+      "note": "body differs between 3.2 and 3.15",
+      "location": "idna.core:valid_contexto"
+    }
+  }
+}

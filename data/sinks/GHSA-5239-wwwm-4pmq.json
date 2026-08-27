@@ -1,0 +1,35 @@
+{
+  "advisory": "GHSA-5239-wwwm-4pmq",
+  "package": "pygments",
+  "sinks": [
+    "pygments.lexers.archetype.AdlLexer",
+    "pygments.lexers.archetype.AtomsLexer"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 24b8aa7 bounds the GUID and archetype id regexes, which are class level token tables in AdlLexer and AtomsLexer",
+  "assumptions": [
+    "the sinks are classes because the vulnerable regex is a class attribute, not a function body",
+    "the regex is executed by RegexLexer.get_tokens_unprocessed in the base class, which the fix did not touch"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "pygments.lexers.archetype.AdlLexer": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.15.0",
+      "fixed_version": "2.20.0",
+      "note": "body differs between 2.15.0 and 2.20.0",
+      "location": "pygments.lexers.archetype:AdlLexer"
+    },
+    "pygments.lexers.archetype.AtomsLexer": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.15.0",
+      "fixed_version": "2.20.0",
+      "note": "body differs between 2.15.0 and 2.20.0",
+      "location": "pygments.lexers.archetype:AtomsLexer"
+    }
+  }
+}

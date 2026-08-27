@@ -1,0 +1,120 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-hgf8-39gv-g3f2 (CVE-2025-66221, GHSA-hgf8-39gv-g3f2, PYSEC-2026-2046)
+Package: werkzeug 2.3.3
+Fixed in: 3.1.4
+Severity: moderate
+
+Summary: Werkzeug safe_join() allows Windows special device names
+
+Details:
+Werkzeug's `safe_join` function allows path segments with Windows device names. On Windows, there are special device names such as `CON`, `AUX`, etc that are implicitly present and readable in every directory. `send_from_directory` uses `safe_join` to safely serve files at user-specified paths under a directory. If the application is running on Windows, and the requested path ends with a special device name, the file will be opened successfully, but reading will hang indefinitely.
+
+References:
+- WEB: https://github.com/pallets/werkzeug/security/advisories/GHSA-hgf8-39gv-g3f2
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-66221
+- WEB: https://github.com/pallets/werkzeug/commit/4b833376a45c323a189cd11d2362bcffdb1c0c13
+- PACKAGE: https://github.com/pallets/werkzeug
+- WEB: https://github.com/pallets/werkzeug/releases/tag/3.1.4
+
+Fix commit, Python hunks only:
+--- https://github.com/pallets/werkzeug/commit/4b833376a45c323a189cd11d2362bcffdb1c0c13.patch ---
+diff --git a/src/werkzeug/security.py b/src/werkzeug/security.py
+index 3f49ad1b4..9c0b7d536 100644
+--- a/src/werkzeug/security.py
++++ b/src/werkzeug/security.py
+@@ -12,6 +12,14 @@
+ _os_alt_seps: list[str] = list(
+     sep for sep in [os.sep, os.path.altsep] if sep is not None and sep != "/"
+ )
++_windows_device_files = {
++    "CON",
++    "PRN",
++    "AUX",
++    "NUL",
++    *(f"COM{i}" for i in range(10)),
++    *(f"LPT{i}" for i in range(10)),
++}
+ 
+ 
+ def gen_salt(length: int) -> str:
+@@ -139,6 +147,9 @@ def safe_join(directory: str, *pathnames: str) -> str | None:
+     :param pathnames: The untrusted path components relative to the
+         base directory.
+     :return: A safe path, otherwise ``None``.
++
++    .. versionchanged:: 3.1.4
++        Special device names are disallowed on Windows.
+     """
+     if not directory:
+         # Ensure we end up with ./path if directory="" is given,
+@@ -153,6 +164,10 @@ def safe_join(directory: str, *pathnames: str) -> str | None:
+ 
+         if (
+             any(sep in filename for sep in _os_alt_seps)
++            or (
++                os.name == "nt"
++                and os.path.splitext(filename)[0].upper() in _windows_device_files
++            )
+             or os.path.isabs(filename)
+             # ntpath.isabs doesn't catch this on Python < 3.11
+             or filename.startswith("/")
+diff --git a/src/werkzeug/utils.py b/src/werkzeug/utils.py
+index 3d3bbf066..0d4a700f0 100644
+--- a/src/werkzeug/utils.py
++++ b/src/werkzeug/utils.py
+@@ -21,6 +21,7 @@
+ from .datastructures import Headers
+ from .exceptions import NotFound
+ from .exceptions import RequestedRangeNotSatisfiable
++from .security import _windows_device_files
+ from .security import safe_join
+ from .wsgi import wrap_file
+ 
+@@ -34,14 +35,6 @@
+ 
+ _entity_re = re.compile(r"&([^;]+);")
+ _filename_ascii_strip_re = re.compile(r"[^A-Za-z0-9_.-]")
+-_windows_device_files = {
+-    "CON",
+-    "PRN",
+-    "AUX",
+-    "NUL",
+-    *(f"COM{i}" for i in range(10)),
+-    *(f"LPT{i}" for i in range(10)),
+-}
+ 
+ 
+ class cached_property(property, t.Generic[_T]):
+diff --git a/tests/test_security.py b/tests/test_security.py
+index 455936879..999bd706c 100644
+--- a/tests/test_security.py
++++ b/tests/test_security.py
+@@ -70,3 +70,11 @@ def test_safe_join_os_sep():
+ 
+ def test_safe_join_empty_trusted():
+     assert safe_join("", "c:test.txt") == "./c:test.txt"
++
++
++def test_safe_join_windows_special(monkeypatch: pytest.MonkeyPatch) -> None:
++    """Windows special device name is not allowed on Windows."""
++    monkeypatch.setattr("os.name", "nt")
++    assert safe_join("a", "CON") is None
++    monkeypatch.setattr("os.name", "posix")
++    assert safe_join("a", "CON") == "a/CON"
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-hgf8-39gv-g3f2", "package": "werkzeug", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-9hjg-9r4m-mvj7",
+  "package": "requests",
+  "sinks": [
+    "requests.utils.get_netrc_auth"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 96ba401 replaces the manual netloc split with ri.hostname inside get_netrc_auth in src/requests/utils.py",
+  "assumptions": [
+    "assumes the flaw is in get_netrc_auth and not in Session.prepare_request, which calls it"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "requests.utils.get_netrc_auth": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.31.0",
+      "fixed_version": "2.32.4",
+      "note": "body differs between 2.31.0 and 2.32.4",
+      "location": "requests.utils:get_netrc_auth"
+    }
+  }
+}

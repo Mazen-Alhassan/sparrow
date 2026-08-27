@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-v92g-xgxw-vvmm",
+  "package": "mako",
+  "sinks": [
+    "mako.template.Template.__init__"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit e05ac61 replaces the single leading slash strip in Template.__init__ with lstrip so it matches TemplateLookup.get_template",
+  "assumptions": [
+    "assumes the sink is Template.__init__ rather than TemplateLookup.get_template, which the advisory also blames but which the fix did not change"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "mako.template.Template.__init__": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.2.4",
+      "fixed_version": "1.3.11",
+      "note": "body differs between 1.2.4 and 1.3.11",
+      "location": "mako.template:Template.__init__"
+    }
+  }
+}

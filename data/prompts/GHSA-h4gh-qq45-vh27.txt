@@ -1,0 +1,37 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-h4gh-qq45-vh27 (none)
+Package: cryptography 41.0.2
+Fixed in: 43.0.1
+Severity: moderate
+
+Summary: pyca/cryptography has a vulnerable OpenSSL included in cryptography wheels
+
+Details:
+pyca/cryptography's wheels include a statically linked copy of OpenSSL. The versions of OpenSSL included in cryptography 37.0.0-43.0.0 are vulnerable to a security issue. More details about the vulnerability itself can be found in https://openssl-library.org/news/secadv/20240903.txt.
+
+If you are building cryptography source ("sdist") then you are responsible for upgrading your copy of OpenSSL. Only users installing from wheels built by the cryptography project (i.e., those distributed on PyPI) need to update their cryptography versions.
+
+
+References:
+- WEB: https://github.com/pyca/cryptography/security/advisories/GHSA-h4gh-qq45-vh27
+- PACKAGE: https://github.com/pyca/cryptography
+- WEB: https://openssl-library.org/news/secadv/20240903.txt
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-h4gh-qq45-vh27", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

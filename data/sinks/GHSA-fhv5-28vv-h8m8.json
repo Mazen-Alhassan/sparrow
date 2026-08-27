@@ -1,0 +1,35 @@
+{
+  "advisory": "GHSA-fhv5-28vv-h8m8",
+  "package": "pyjwt",
+  "sinks": [
+    "jwt.jwks_client.PyJWKClient.get_signing_key",
+    "jwt.jwks_client.PyJWKClient.fetch_data"
+  ],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked; the advisory cites jwt/jwks_client.py lines 172 to 198 for get_signing_key and 120 to 122 for the fetch_data finally block",
+  "assumptions": [
+    "method names come from the advisory's line references, not from a diff",
+    "assumes 2.4.0 uses the same names, and the advisory says all versions from 2.4.0 are affected"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "jwt.jwks_client.PyJWKClient.get_signing_key": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.4.0",
+      "fixed_version": "2.13.0",
+      "note": "body differs between 2.4.0 and 2.13.0",
+      "location": "jwt.jwks_client:PyJWKClient.get_signing_key"
+    },
+    "jwt.jwks_client.PyJWKClient.fetch_data": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.4.0",
+      "fixed_version": "2.13.0",
+      "note": "body differs between 2.4.0 and 2.13.0",
+      "location": "jwt.jwks_client:PyJWKClient.fetch_data"
+    }
+  }
+}

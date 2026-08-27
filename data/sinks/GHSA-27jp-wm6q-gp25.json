@@ -1,0 +1,35 @@
+{
+  "advisory": "GHSA-27jp-wm6q-gp25",
+  "package": "sqlparse",
+  "sinks": [
+    "sqlparse.engine.grouping._group_matching",
+    "sqlparse.engine.grouping._group"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 40ed3aa adds depth and token count limits inside _group_matching and _group in sqlparse/engine/grouping.py",
+  "assumptions": [
+    "assumes the unbounded recursion is in the two modified helpers rather than in group() which calls them",
+    "both helpers are private, so a caller-level sink would be sqlparse.engine.grouping.group"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "sqlparse.engine.grouping._group_matching": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.4.4",
+      "fixed_version": "0.5.4",
+      "note": "body differs between 0.4.4 and 0.5.4",
+      "location": "sqlparse.engine.grouping:_group_matching"
+    },
+    "sqlparse.engine.grouping._group": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.4.4",
+      "fixed_version": "0.5.4",
+      "note": "body differs between 0.4.4 and 0.5.4",
+      "location": "sqlparse.engine.grouping:_group"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-9v9h-cgj8-h64p",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the fix is in OpenSSL itself, vendored into the cryptography wheels; every linked commit is in openssl or openssl-src-rs",
+  "assumptions": [
+    "assumes a vendored C fix has no Python sink",
+    "the Python entry point is cryptography.hazmat.primitives.serialization.pkcs12.load_key_and_certificates, which was not changed"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

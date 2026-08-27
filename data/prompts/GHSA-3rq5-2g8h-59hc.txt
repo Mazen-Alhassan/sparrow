@@ -1,0 +1,277 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-3rq5-2g8h-59hc (CVE-2023-29483, GHSA-3rq5-2g8h-59hc, PYSEC-2026-1307, PYSEC-2026-2472)
+Package: dnspython 2.1.0
+Fixed in: 2.6.1
+Severity: moderate
+
+Summary: Potential DoS via the Tudoor mechanism in eventlet and dnspython
+
+Details:
+eventlet before 0.35.2, as used in dnspython before 2.6.0, allows remote attackers to interfere with DNS name resolution by quickly sending an invalid packet from the expected IP address and source port, aka a "TuDoor" attack. In other words, dnspython does not have the preferred behavior in which the DNS name resolution algorithm would proceed, within the full time window, in order to wait for a valid packet. NOTE: dnspython 2.6.0 is unusable for a different reason that was addressed in 2.6.1.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2023-29483
+- WEB: https://github.com/eventlet/eventlet/issues/913
+- WEB: https://github.com/rthalley/dnspython/issues/1045
+- WEB: https://github.com/eventlet/eventlet/commit/51e3c4928d4938beb576eff34f3bf97e6e64e6b4
+- WEB: https://github.com/rthalley/dnspython/commit/0ea5ad0a4583e1f519b9bcc67cfac381230d9cf2
+- PACKAGE: https://github.com/eventlet/eventlet
+- WEB: https://github.com/eventlet/eventlet/releases/tag/v0.35.2
+- WEB: https://github.com/rthalley/dnspython/releases/tag/v2.6.0
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/NLRKR57IFVKQC2GCXZBFLCLBAWBWL3F6
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/VOHJOO3OM65UIUUUVDEXMCTXNM6LXZEH
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/X3BNSIK5NFYSAP53Y45GOCMOQHHDLGIF
+- WEB: https://security.netapp.com/advisory/ntap-20240510-0001
+
+Fix commit, Python hunks only:
+--- https://github.com/eventlet/eventlet/commit/51e3c4928d4938beb576eff34f3bf97e6e64e6b4.patch ---
+diff --git a/eventlet/support/greendns.py b/eventlet/support/greendns.py
+index 626214235..365664f24 100644
+--- a/eventlet/support/greendns.py
++++ b/eventlet/support/greendns.py
+@@ -713,7 +713,7 @@ def _net_write(sock, data, expiration):
+ def udp(q, where, timeout=DNS_QUERY_TIMEOUT, port=53,
+         af=None, source=None, source_port=0, ignore_unexpected=False,
+         one_rr_per_rrset=False, ignore_trailing=False,
+-        raise_on_truncation=False, sock=None):
++        raise_on_truncation=False, sock=None, ignore_errors=False):
+     """coro friendly replacement for dns.query.udp
+     Return the response obtained after sending a query via UDP.
+ 
+@@ -752,7 +752,10 @@ def udp(q, where, timeout=DNS_QUERY_TIMEOUT, port=53,
+     query.  If None, the default, a socket is created.  Note that
+     if a socket is provided, it must be a nonblocking datagram socket,
+     and the source and source_port are ignored.
+-    @type sock: socket.socket | None"""
++    @type sock: socket.socket | None
++    @param ignore_errors: if various format errors or response mismatches occur,
++    continue listening.
++    @type ignore_errors: bool"""
+ 
+     wire = q.to_wire()
+     if af is None:
+@@ -816,26 +819,43 @@ def udp(q, where, timeout=DNS_QUERY_TIMEOUT, port=53,
+                 addr = from_address[0]
+                 addr = dns.ipv6.inet_ntoa(dns.ipv6.inet_aton(addr))
+                 from_address = (addr, from_address[1], from_address[2], from_address[3])
+-            if from_address == destination:
++            if from_address != destination:
++                if ignore_unexpected:
++                    continue
++                else:
++                    raise dns.query.UnexpectedSource(
++                        'got a response from %s instead of %s'
++                        % (from_address, destination))
++            try:
++                if _handle_raise_on_truncation:
++                    r = dns.message.from_wire(wire,
++                                              keyring=q.keyring,
++                                              request_mac=q.mac,
++                                              one_rr_per_rrset=one_rr_per_rrset,
++                                              ignore_trailing=ignore_trailing,
++                                              raise_on_truncation=raise_on_truncation)
++                else:
++                    r = dns.message.from_wire(wire,
++                                              keyring=q.keyring,
++                                              request_mac=q.mac,
++                                              one_rr_per_rrset=one_rr_per_rrset,
++                                              ignore_trailing=ignore_trailing)
++                if not q.is_response(r):
++                    raise dns.query.BadResponse()
+                 break
+-            if not ignore_unexpected:
+-                raise dns.query.UnexpectedSource(
+-                    'got a response from %s instead of %s'
+-                    % (from_address, destination))
++            except dns.message.Truncated as e:
++                if ignore_errors and not q.is_response(e.message()):
++                    continue
++                else:
++                    raise
++            except Exception:
++                if ignore_errors:
++                    continue
++                else:
++                    raise
+     finally:
+         s.close()
+ 
+-    if _handle_raise_on_truncation:
+-        r = dns.message.from_wire(wire, keyring=q.keyring, request_mac=q.mac,
+-                                  one_rr_per_rrset=one_rr_per_rrset,
+-                                  ignore_trailing=ignore_trailing,
+-                                  raise_on_truncation=raise_on_truncation)
+-    else:
+-        r = dns.message.from_wire(wire, keyring=q.keyring, request_mac=q.mac,
+-                                  one_rr_per_rrset=one_rr_per_rrset,
+-                                  ignore_trailing=ignore_trailing)
+-    if not q.is_response(r):
+-        raise dns.query.BadResponse()
+     return r
+ 
+ 
+
+--- https://github.com/rthalley/dnspython/commit/0ea5ad0a4583e1f519b9bcc67cfac381230d9cf2.patch ---
+diff --git a/dns/asyncquery.py b/dns/asyncquery.py
+index 94cb24133..4d9ab9ae4 100644
+--- a/dns/asyncquery.py
++++ b/dns/asyncquery.py
+@@ -151,6 +151,16 @@ async def receive_udp(
+                 ignore_trailing=ignore_trailing,
+                 raise_on_truncation=raise_on_truncation,
+             )
++        except dns.message.Truncated as e:
++            # See the comment in query.py for details.
++            if (
++                ignore_errors
++                and query is not None
++                and not query.is_response(e.message())
++            ):
++                continue
++            else:
++                raise
+         except Exception:
+             if ignore_errors:
+                 continue
+diff --git a/dns/query.py b/dns/query.py
+index bdd251e75..f0ee9161f 100644
+--- a/dns/query.py
++++ b/dns/query.py
+@@ -638,6 +638,20 @@ def receive_udp(
+                 ignore_trailing=ignore_trailing,
+                 raise_on_truncation=raise_on_truncation,
+             )
++        except dns.message.Truncated as e:
++            # If we got Truncated and not FORMERR, we at least got the header with TC
++            # set, and very likely the question section, so we'll re-raise if the
++            # message seems to be a response as we need to know when truncation happens.
++            # We need to check that it seems to be a response as we don't want a random
++            # injected message with TC set to cause us to bail out.
++            if (
++                ignore_errors
++                and query is not None
++                and not query.is_response(e.message())
++            ):
++                continue
++            else:
++                raise
+         except Exception:
+             if ignore_errors:
+                 continue
+diff --git a/tests/test_async.py b/tests/test_async.py
+index ba2078cde..9373548d7 100644
+--- a/tests/test_async.py
++++ b/tests/test_async.py
+@@ -705,7 +705,11 @@ async def mock_receive(
+         from2,
+         ignore_unexpected=True,
+         ignore_errors=True,
++        raise_on_truncation=False,
++        good_r=None,
+     ):
++        if good_r is None:
++            good_r = self.good_r
+         s = MockSock(wire1, from1, wire2, from2)
+         (r, when, _) = await dns.asyncquery.receive_udp(
+             s,
+@@ -713,9 +717,10 @@ async def mock_receive(
+             time.time() + 2,
+             ignore_unexpected=ignore_unexpected,
+             ignore_errors=ignore_errors,
++            raise_on_truncation=raise_on_truncation,
+             query=self.q,
+         )
+-        self.assertEqual(r, self.good_r)
++        self.assertEqual(r, good_r)
+ 
+     def test_good_mock(self):
+         async def run():
+@@ -802,6 +807,59 @@ async def run():
+ 
+         self.async_run(run)
+ 
++    def test_good_wire_with_truncation_flag_and_no_truncation_raise(self):
++        async def run():
++            tc_r = dns.message.make_response(self.q)
++            tc_r.flags |= dns.flags.TC
++            tc_r_wire = tc_r.to_wire()
++            await self.mock_receive(
++                tc_r_wire, ("127.0.0.1", 53), None, None, good_r=tc_r
++            )
++
++        self.async_run(run)
++
++    def test_good_wire_with_truncation_flag_and_truncation_raise(self):
++        async def agood():
++            tc_r = dns.message.make_response(self.q)
++            tc_r.flags |= dns.flags.TC
++            tc_r_wire = tc_r.to_wire()
++            await self.mock_receive(
++                tc_r_wire, ("127.0.0.1", 53), None, None, raise_on_truncation=True
++            )
++
++        def good():
++            self.async_run(agood)
++
++        self.assertRaises(dns.message.Truncated, good)
++
++    def test_wrong_id_wire_with_truncation_flag_and_no_truncation_raise(self):
++        async def run():
++            bad_r = dns.message.make_response(self.q)
++            bad_r.id += 1
++            bad_r.flags |= dns.flags.TC
++            bad_r_wire = bad_r.to_wire()
++            await self.mock_receive(
++                bad_r_wire, ("127.0.0.1", 53), self.good_r_wire, ("127.0.0.1", 53)
++            )
++
++        self.async_run(run)
++
++    def test_wrong_id_wire_with_truncation_flag_and_truncation_raise(self):
++        async def run():
++            bad_r = dns.message.make_response(self.q)
++            bad_r.id += 1
++            bad_r.flags |= dns.flags.TC
++            bad_r_wire = bad_r.to_wire()
++            await self.mock_receive(
++                bad_r_wire,
++                ("127.0.0.1", 53),
++                self.good_r_wire,
++                ("127.0.0.1", 53),
++                raise_on_truncation=True,
++            )
++
++        self.async_run(run)
++
+     def test_bad_wire_not_ignored(self):
+         bad_r = dns.message.make_response(self.q)
+         bad_r.id += 1
+diff --git a/tests/test_query.py b/tests/test_query.py
+index 1039a14eb..62007e857 100644
+--- a/tests/test_query.py
++++ b/tests/test_query.py
+@@ -29,6 +29,7 @@
+     have_ssl = False
+ 
+ import dns.exception
++import dns.flags
+ import dns.inet
+ import dns.message
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-3rq5-2g8h-59hc", "package": "dnspython", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

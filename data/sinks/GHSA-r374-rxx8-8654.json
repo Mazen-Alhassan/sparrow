@@ -1,0 +1,34 @@
+{
+  "advisory": "GHSA-r374-rxx8-8654",
+  "package": "paramiko",
+  "sinks": [
+    "paramiko.auth_handler.AuthHandler._parse_userauth_request",
+    "paramiko.rsakey.RSAKey.verify_ssh_sig"
+  ],
+  "confidence": "low",
+  "evidence": "fix commit a448945 is a work in progress that touches auth_handler and client; the advisory names rsakey.py as the file that still allows SHA-1",
+  "assumptions": [
+    "the advisory says the fix is before commit a448945, and that commit only adds TODO comments, so the sink is a guess",
+    "assumes the class in auth_handler.py is AuthHandler",
+    "verify_ssh_sig was inferred from the advisory naming rsakey.py, not from the diff"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "paramiko.auth_handler.AuthHandler._parse_userauth_request": {
+      "status": "no_fixed_version",
+      "present_in_vulnerable": false,
+      "changed_in_fixed": false,
+      "vulnerable_version": "2.11.0",
+      "fixed_version": "",
+      "note": "advisory lists no fixed version"
+    },
+    "paramiko.rsakey.RSAKey.verify_ssh_sig": {
+      "status": "no_fixed_version",
+      "present_in_vulnerable": false,
+      "changed_in_fixed": false,
+      "vulnerable_version": "2.11.0",
+      "fixed_version": "",
+      "note": "advisory lists no fixed version"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "advisory": "GHSA-45x7-px36-x8w8",
+  "package": "paramiko",
+  "sinks": [
+    "paramiko.transport.Transport._parse_kex_init",
+    "paramiko.packet.Packetizer.read_message"
+  ],
+  "confidence": "low",
+  "evidence": "no fix commit is linked; paramiko 3.4.0 added strict key exchange, which lives in the transport handshake and the packet sequence handling",
+  "assumptions": [
+    "the function names were inferred from the described mitigation, not read from a diff",
+    "the flaw is in the SSH protocol rather than in one function, so any sink here is an approximation",
+    "assumes 2.11.0 uses the same names as 3.4.0"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "paramiko.transport.Transport._parse_kex_init": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.11.0",
+      "fixed_version": "3.4.0",
+      "note": "body differs between 2.11.0 and 3.4.0",
+      "location": "paramiko.transport:Transport._parse_kex_init"
+    },
+    "paramiko.packet.Packetizer.read_message": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.11.0",
+      "fixed_version": "3.4.0",
+      "note": "body differs between 2.11.0 and 3.4.0",
+      "location": "paramiko.packet:Packetizer.read_message"
+    }
+  }
+}

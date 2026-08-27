@@ -1,0 +1,285 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-pq67-6m6q-mj2v (CVE-2025-50181, GHSA-pq67-6m6q-mj2v, PYSEC-2026-1999)
+Package: urllib3 1.26.6
+Fixed in: 2.5.0
+Severity: moderate
+
+Summary: urllib3 redirects are not disabled when retries are disabled on PoolManager instantiation
+
+Details:
+urllib3 handles redirects and retries using the same mechanism, which is controlled by the `Retry` object. The most common way to disable redirects is at the request level, as follows:
+
+```python
+resp = urllib3.request("GET", "https://httpbin.org/redirect/1", redirect=False)
+print(resp.status)
+# 302
+```
+
+However, it is also possible to disable redirects, for all requests, by instantiating a `PoolManager` and specifying `retries` in a way that disable redirects:
+
+```python
+import urllib3
+
+http = urllib3.PoolManager(retries=0)  # should raise MaxRetryError on redirect
+http = urllib3.PoolManager(retries=urllib3.Retry(redirect=0))  # equivalent to the above
+http = urllib3.PoolManager(retries=False)  # should return the first response
+
+resp = http.request("GET", "https://httpbin.org/redirect/1")
+```
+
+However, the `retries` parameter is currently ignored, which means all the above examples don't disable redirects.
+
+## Affected usages
+
+Passing `retries` on `PoolManager` instantiation to disable redirects or restrict their number.
+
+By default, requests and botocore users are not affected.
+
+## Impact
+
+Redirects are often used to exploit SSRF vulnerabilities. An application attempting to mitigate SSRF or open redirect vulnerabilities by disabling redirects at the PoolManager level will remain vulnerable.
+
+## Remediation
+
+You can remediate this vulnerability with the following steps:
+
+ * Upgrade to a patched version of urllib3. If your organization would benefit from the continued support of urllib3 1.x, please contact [sethmichaellarson@gmail.com](mailto:sethmichaellarson@gmail.com) to discuss sponsorship or contribution opportunities.
+ * Disable redirects at the `request()` level instead of the `PoolManager()` level.
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-pq67-6m6q-mj2v
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-50181
+- WEB: https://github.com/urllib3/urllib3/commit/f05b1329126d5be6de501f9d1e3e36738bc08857
+- PACKAGE: https://github.com/urllib3/urllib3
+- WEB: https://github.com/urllib3/urllib3/releases/tag/2.5.0
+
+Fix commit, Python hunks only:
+--- https://github.com/urllib3/urllib3/commit/f05b1329126d5be6de501f9d1e3e36738bc08857.patch ---
+diff --git a/dummyserver/app.py b/dummyserver/app.py
+index 97b1b2394f..0eeb93f739 100644
+--- a/dummyserver/app.py
++++ b/dummyserver/app.py
+@@ -227,6 +227,7 @@ async def encodingrequest() -> ResponseReturnValue:
+ 
+ 
+ @hypercorn_app.route("/redirect", methods=["GET", "POST", "PUT"])
++@pyodide_testing_app.route("/redirect", methods=["GET", "POST", "PUT"])
+ async def redirect() -> ResponseReturnValue:
+     "Perform a redirect to ``target``"
+     values = await request.values
+diff --git a/src/urllib3/poolmanager.py b/src/urllib3/poolmanager.py
+index 085d1dbafd..5763fea808 100644
+--- a/src/urllib3/poolmanager.py
++++ b/src/urllib3/poolmanager.py
+@@ -203,6 +203,22 @@ def __init__(
+         **connection_pool_kw: typing.Any,
+     ) -> None:
+         super().__init__(headers)
++        if "retries" in connection_pool_kw:
++            retries = connection_pool_kw["retries"]
++            if not isinstance(retries, Retry):
++                # When Retry is initialized, raise_on_redirect is based
++                # on a redirect boolean value.
++                # But requests made via a pool manager always set
++                # redirect to False, and raise_on_redirect always ends
++                # up being False consequently.
++                # Here we fix the issue by setting raise_on_redirect to
++                # a value needed by the pool manager without considering
++                # the redirect boolean.
++                raise_on_redirect = retries is not False
++                retries = Retry.from_int(retries, redirect=False)
++                retries.raise_on_redirect = raise_on_redirect
++                connection_pool_kw = connection_pool_kw.copy()
++                connection_pool_kw["retries"] = retries
+         self.connection_pool_kw = connection_pool_kw
+ 
+         self.pools: RecentlyUsedContainer[PoolKey, HTTPConnectionPool]
+@@ -456,7 +472,7 @@ def urlopen(  # type: ignore[override]
+             kw["body"] = None
+             kw["headers"] = HTTPHeaderDict(kw["headers"])._prepare_for_method_change()
+ 
+-        retries = kw.get("retries")
++        retries = kw.get("retries", response.retries)
+         if not isinstance(retries, Retry):
+             retries = Retry.from_int(retries, redirect=redirect)
+ 
+diff --git a/test/contrib/emscripten/test_emscripten.py b/test/contrib/emscripten/test_emscripten.py
+index 4872e5be7d..dfed509c13 100644
+--- a/test/contrib/emscripten/test_emscripten.py
++++ b/test/contrib/emscripten/test_emscripten.py
+@@ -944,6 +944,22 @@ def count_calls(self, *args, **argv):  # type: ignore[no-untyped-def]
+     pyodide_test(selenium_coverage, testserver_http.http_host, find_unused_port())
+ 
+ 
++def test_redirects(
++    selenium_coverage: typing.Any, testserver_http: PyodideServerInfo
++) -> None:
++    @run_in_pyodide  # type: ignore[misc]
++    def pyodide_test(selenium_coverage: typing.Any, host: str, port: int) -> None:
++        from urllib3 import request
++
++        redirect_url = f"http://{host}:{port}/redirect"
++        response = request("GET", redirect_url)
++        assert response.status == 200
++
++    pyodide_test(
++        selenium_coverage, testserver_http.http_host, testserver_http.http_port
++    )
++
++
+ def test_insecure_requests_warning(
+     selenium_coverage: typing.Any, testserver_http: PyodideServerInfo
+ ) -> None:
+diff --git a/test/test_poolmanager.py b/test/test_poolmanager.py
+index ab5f20309b..b481a19d59 100644
+--- a/test/test_poolmanager.py
++++ b/test/test_poolmanager.py
+@@ -379,9 +379,10 @@ def test_pool_kwargs_socket_options(self) -> None:
+ 
+     def test_merge_pool_kwargs(self) -> None:
+         """Assert _merge_pool_kwargs works in the happy case"""
+-        p = PoolManager(retries=100)
++        retries = retry.Retry(total=100)
++        p = PoolManager(retries=retries)
+         merged = p._merge_pool_kwargs({"new_key": "value"})
+-        assert {"retries": 100, "new_key": "value"} == merged
++        assert {"retries": retries, "new_key": "value"} == merged
+ 
+     def test_merge_pool_kwargs_none(self) -> None:
+         """Assert false-y values to _merge_pool_kwargs result in defaults"""
+diff --git a/test/with_dummyserver/test_poolmanager.py b/test/with_dummyserver/test_poolmanager.py
+index af77241d6c..7f163ab330 100644
+--- a/test/with_dummyserver/test_poolmanager.py
++++ b/test/with_dummyserver/test_poolmanager.py
+@@ -84,6 +84,89 @@ def test_redirect_to_relative_url(self) -> None:
+             assert r.status == 200
+             assert r.data == b"Dummy server!"
+ 
++    @pytest.mark.parametrize(
++        "retries",
++        (0, Retry(total=0), Retry(redirect=0), Retry(total=0, redirect=0)),
++    )
++    def test_redirects_disabled_for_pool_manager_with_0(
++        self, retries: typing.Literal[0] | Retry
++    ) -> None:
++        """
++        Check handling redirects when retries is set to 0 on the pool
++        manager.
++        """
++        with PoolManager(retries=retries) as http:
++            with pytest.raises(MaxRetryError):
++                http.request("GET", f"{self.base_url}/redirect")
++
++            # Setting redirect=True should not change the behavior.
++            with pytest.raises(MaxRetryError):
++                http.request("GET", f"{self.base_url}/redirect", redirect=True)
++
++            # Setting redirect=False should not make it follow the redirect,
++            # but MaxRetryError should not be raised.
++            response = http.request("GET", f"{self.base_url}/redirect", redirect=False)
++            assert response.status == 303
++
++    @pytest.mark.parametrize(
++        "retries",
++        (
++            False,
++            Retry(total=False),
++            Retry(redirect=False),
++            Retry(total=False, redirect=False),
++        ),
++    )
++    def test_redirects_disabled_for_pool_manager_with_false(
++        self, retries: typing.Literal[False] | Retry
++    ) -> None:
++        """
++        Check that setting retries set to False on the pool manager disables
++        raising MaxRetryError and redirect=True does not change the
++        behavior.
++        """
++        with PoolManager(retries=retries) as http:
++            response = http.request("GET", f"{self.base_url}/redirect")
++            assert response.status == 303
++
++            response = http.request("GET", f"{self.base_url}/redirect", redirect=True)
++            assert response.status == 303
++
++            response = http.request("GET", f"{self.base_url}/redirect", redirect=False)
++            assert response.status == 303
++
++    def test_redirects_disabled_for_individual_request(self) -> None:
++        """
++        Check handling redirects when they are meant to be disabled
++        on the request level.
++        """
++        with PoolManager() as http:
++            # Check when redirect is not passed.
++            with pytest.raises(MaxRetryError):
++                http.request("GET", f"{self.base_url}/redirect", retries=0)
++            response = http.request("GET", f"{self.base_url}/redirect", retries=False)
++            assert response.status == 303
++
++            # Check when redirect=True.
++            with pytest.raises(MaxRetryError):
++                http.request(
++                    "GET", f"{self.base_url}/redirect", retries=0, redirect=True
++                )
++            response = http.request(
++                "GET", f"{self.base_url}/redirect", retries=False, redirect=True
++            )
++            assert response.status == 303
++
++            # Check when redirect=False.
++            response = http.request(
++                "GET", f"{self.base_url}/redirect", retries=0, redirect=False
++            )
++            assert response.status == 303
++            response = http.request(
++                "GET", f"{self.base_url}/redirect", retries=False, redirect=False
++            )
++            assert response.status == 303
++
+     def test_cross_host_redirect(self) -> None:
+         with PoolManager() as http:
+             cross_host_location = f"{self.base_url_alt}/echo?a=b"
+@@ -138,6 +221,24 @@ def test_too_many_redirects(self) -> None:
+             pool = http.connection_from_host(self.host, self.port)
+             assert pool.num_connections == 1
+ 
++        # Check when retries are configured for the pool manager.
++        with PoolManager(retries=1) as http:
++            with pytest.raises(MaxRetryError):
++                http.request(
++                    "GET",
++                    f"{self.base_url}/redirect",
++                    fields={"target": f"/redirect?target={self.base_url}/"},
++                )
++
++            # Here we allow more retries for the request.
++            response = http.request(
++                "GET",
++                f"{self.base_url}/redirect",
++                fields={"target": f"/redirect?target={self.base_url}/"},
++                retries=2,
++            )
++            assert response.status == 200
++
+     def test_redirect_cross_host_remove_headers(self) -> None:
+         with PoolManager() as http:
+             r = http.request(
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-pq67-6m6q-mj2v", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

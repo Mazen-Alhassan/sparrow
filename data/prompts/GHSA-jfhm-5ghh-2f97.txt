@@ -1,0 +1,158 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-jfhm-5ghh-2f97 (CVE-2023-49083, GHSA-jfhm-5ghh-2f97, PYSEC-2023-254)
+Package: cryptography 41.0.2
+Fixed in: 41.0.6
+Severity: moderate
+
+Summary: cryptography vulnerable to NULL-dereference when loading PKCS7 certificates
+
+Details:
+### Summary
+
+Calling `load_pem_pkcs7_certificates` or `load_der_pkcs7_certificates` could lead to a NULL-pointer dereference and segfault.
+
+### PoC
+Here is a Python code that triggers the issue:
+```python
+from cryptography.hazmat.primitives.serialization.pkcs7 import load_der_pkcs7_certificates, load_pem_pkcs7_certificates
+
+pem_p7 = b"""
+-----BEGIN PKCS7-----
+MAsGCSqGSIb3DQEHAg==
+-----END PKCS7-----
+"""
+
+der_p7 = b"\x30\x0B\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x07\x02"
+
+load_pem_pkcs7_certificates(pem_p7)
+load_der_pkcs7_certificates(der_p7)
+```
+
+### Impact
+Exploitation of this vulnerability poses a serious risk of Denial of Service (DoS) for any application attempting to deserialize a PKCS7 blob/certificate. The consequences extend to potential disruptions in system availability and stability.
+
+References:
+- WEB: https://github.com/pyca/cryptography/security/advisories/GHSA-jfhm-5ghh-2f97
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2023-49083
+- WEB: https://github.com/pyca/cryptography/pull/9926
+- WEB: https://github.com/pyca/cryptography/commit/f09c261ca10a31fe41b1262306db7f8f1da0e48a
+- PACKAGE: https://github.com/pyca/cryptography
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/cryptography/PYSEC-2023-254.yaml
+- WEB: https://lists.debian.org/debian-lts-announce/2024/10/msg00012.html
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/QMNTYMUGFJSDBYBU22FUYBHFRZODRKXV
+- WEB: http://www.openwall.com/lists/oss-security/2023/11/29/2
+
+Fix commit, Python hunks only:
+--- https://github.com/pyca/cryptography/pull/9926.diff ---
+diff --git a/src/cryptography/hazmat/backends/openssl/backend.py b/src/cryptography/hazmat/backends/openssl/backend.py
+index 7c08862b3070..adfd7aefe5f0 100644
+--- a/src/cryptography/hazmat/backends/openssl/backend.py
++++ b/src/cryptography/hazmat/backends/openssl/backend.py
+@@ -1111,9 +1111,12 @@ def _load_pkcs7_certificates(self, p7) -> list[x509.Certificate]:
+                 _Reasons.UNSUPPORTED_SERIALIZATION,
+             )
+ 
++        certs: list[x509.Certificate] = []
++        if p7.d.sign == self._ffi.NULL:
++            return certs
++
+         sk_x509 = p7.d.sign.cert
+         num = self._lib.sk_X509_num(sk_x509)
+-        certs = []
+         for i in range(num):
+             x509 = self._lib.sk_X509_value(sk_x509, i)
+             self.openssl_assert(x509 != self._ffi.NULL)
+diff --git a/tests/hazmat/primitives/test_pkcs7.py b/tests/hazmat/primitives/test_pkcs7.py
+index ceb84e5fb48e..434a361057f2 100644
+--- a/tests/hazmat/primitives/test_pkcs7.py
++++ b/tests/hazmat/primitives/test_pkcs7.py
+@@ -89,6 +89,12 @@ def test_load_pkcs7_unsupported_type(self, backend):
+                 mode="rb",
+             )
+ 
++    def test_load_pkcs7_empty_certificates(self):
++        der = b"\x30\x0B\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x07\x02"
++
++        certificates = pkcs7.load_der_pkcs7_certificates(der)
++        assert certificates == []
++
+ 
+ # We have no public verification API and won't be adding one until we get
+ # some requirements from users so this function exists to give us basic
+
+--- https://github.com/pyca/cryptography/commit/f09c261ca10a31fe41b1262306db7f8f1da0e48a.patch ---
+diff --git a/src/cryptography/__about__.py b/src/cryptography/__about__.py
+index 550ee4508d16..d267dc785605 100644
+--- a/src/cryptography/__about__.py
++++ b/src/cryptography/__about__.py
+@@ -10,7 +10,7 @@
+     "__copyright__",
+ ]
+ 
+-__version__ = "41.0.5"
++__version__ = "41.0.6"
+ 
+ 
+ __author__ = "The Python Cryptographic Authority and individual contributors"
+diff --git a/src/cryptography/hazmat/backends/openssl/backend.py b/src/cryptography/hazmat/backends/openssl/backend.py
+index 02d51094cfe5..f1c79008b689 100644
+--- a/src/cryptography/hazmat/backends/openssl/backend.py
++++ b/src/cryptography/hazmat/backends/openssl/backend.py
+@@ -1890,9 +1890,12 @@ def _load_pkcs7_certificates(self, p7) -> typing.List[x509.Certificate]:
+                 _Reasons.UNSUPPORTED_SERIALIZATION,
+             )
+ 
++        certs: list[x509.Certificate] = []
++        if p7.d.sign == self._ffi.NULL:
++            return certs
++
+         sk_x509 = p7.d.sign.cert
+         num = self._lib.sk_X509_num(sk_x509)
+-        certs = []
+         for i in range(num):
+             x509 = self._lib.sk_X509_value(sk_x509, i)
+             self.openssl_assert(x509 != self._ffi.NULL)
+diff --git a/tests/hazmat/primitives/test_pkcs7.py b/tests/hazmat/primitives/test_pkcs7.py
+index 172cf40bd6e4..f6ad64151cb3 100644
+--- a/tests/hazmat/primitives/test_pkcs7.py
++++ b/tests/hazmat/primitives/test_pkcs7.py
+@@ -89,6 +89,12 @@ def test_load_pkcs7_unsupported_type(self, backend):
+                 mode="rb",
+             )
+ 
++    def test_load_pkcs7_empty_certificates(self, backend):
++        der = b"\x30\x0B\x06\x09\x2A\x86\x48\x86\xF7\x0D\x01\x07\x02"
++
++        certificates = pkcs7.load_der_pkcs7_certificates(der)
++        assert certificates == []
++
+ 
+ # We have no public verification API and won't be adding one until we get
+ # some requirements from users so this function exists to give us basic
+diff --git a/vectors/cryptography_vectors/__about__.py b/vectors/cryptography_vectors/__about__.py
+index 56336c326d11..98da9267aa4c 100644
+--- a/vectors/cryptography_vectors/__about__.py
++++ b/vectors/cryptography_vectors/__about__.py
+@@ -6,4 +6,4 @@
+     "__version__",
+ ]
+ 
+-__version__ = "41.0.5"
++__version__ = "41.0.6"
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-jfhm-5ghh-2f97", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

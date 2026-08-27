@@ -1,0 +1,119 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-h75v-3vvj-5mfj (CVE-2024-34064, GHSA-h75v-3vvj-5mfj, PYSEC-2026-1474)
+Package: jinja2 3.1.2
+Fixed in: 3.1.4
+Severity: moderate
+
+Summary: Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter
+
+Details:
+The `xmlattr` filter in affected versions of Jinja accepts keys containing non-attribute characters. XML/HTML attributes cannot contain spaces, `/`, `>`, or `=`, as each would then be interpreted as starting a separate attribute. If an application accepts keys (as opposed to only values) as user input, and renders these in pages that other users see as well, an attacker could use this to inject other attributes and perform XSS. The fix for the previous GHSA-h5c8-rqwp-cp95 CVE-2024-22195 only addressed spaces but not other characters.
+
+Accepting keys as user input is now explicitly considered an unintended use case of the `xmlattr` filter, and code that does so without otherwise validating the input should be flagged as insecure, regardless of Jinja version. Accepting _values_ as user input continues to be safe.
+
+References:
+- WEB: https://github.com/pallets/jinja/security/advisories/GHSA-h75v-3vvj-5mfj
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-34064
+- WEB: https://github.com/pallets/jinja/commit/0668239dc6b44ef38e7a6c9f91f312fd4ca581cb
+- PACKAGE: https://github.com/pallets/jinja
+- WEB: https://lists.debian.org/debian-lts-announce/2024/12/msg00009.html
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/567XIGSZMABG6TSMYWD7MIYNJSUQQRUC
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/GCLF44KY43BSVMTE6S53B4V5WP3FRRSE
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/SSCBHIL6BYKR5NRCBXP4XMP2CEEKGFVS
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/ZALNWE3TXPPHVPSI3AZ5CTMSTAVN5UMS
+
+Fix commit, Python hunks only:
+--- https://github.com/pallets/jinja/commit/0668239dc6b44ef38e7a6c9f91f312fd4ca581cb.patch ---
+diff --git a/src/jinja2/filters.py b/src/jinja2/filters.py
+index 4cf3c11fb..acd11976e 100644
+--- a/src/jinja2/filters.py
++++ b/src/jinja2/filters.py
+@@ -250,7 +250,9 @@ def do_items(value: t.Union[t.Mapping[K, V], Undefined]) -> t.Iterator[t.Tuple[K
+     yield from value.items()
+ 
+ 
+-_space_re = re.compile(r"\s", flags=re.ASCII)
++# Check for characters that would move the parser state from key to value.
++# https://html.spec.whatwg.org/#attribute-name-state
++_attr_key_re = re.compile(r"[\s/>=]", flags=re.ASCII)
+ 
+ 
+ @pass_eval_context
+@@ -259,8 +261,14 @@ def do_xmlattr(
+ ) -> str:
+     """Create an SGML/XML attribute string based on the items in a dict.
+ 
+-    If any key contains a space, this fails with a ``ValueError``. Values that
+-    are neither ``none`` nor ``undefined`` are automatically escaped.
++    **Values** that are neither ``none`` nor ``undefined`` are automatically
++    escaped, safely allowing untrusted user input.
++
++    User input should not be used as **keys** to this filter. If any key
++    contains a space, ``/`` solidus, ``>`` greater-than sign, or ``=`` equals
++    sign, this fails with a ``ValueError``. Regardless of this, user input
++    should never be used as keys to this filter, or must be separately validated
++    first.
+ 
+     .. sourcecode:: html+jinja
+ 
+@@ -280,6 +288,10 @@ def do_xmlattr(
+     As you can see it automatically prepends a space in front of the item
+     if the filter returned something unless the second parameter is false.
+ 
++    .. versionchanged:: 3.1.4
++        Keys with ``/`` solidus, ``>`` greater-than sign, or ``=`` equals sign
++        are not allowed.
++
+     .. versionchanged:: 3.1.3
+         Keys with spaces are not allowed.
+     """
+@@ -289,8 +301,8 @@ def do_xmlattr(
+         if value is None or isinstance(value, Undefined):
+             continue
+ 
+-        if _space_re.search(key) is not None:
+-            raise ValueError(f"Spaces are not allowed in attributes: '{key}'")
++        if _attr_key_re.search(key) is not None:
++            raise ValueError(f"Invalid character in attribute name: {key!r}")
+ 
+         items.append(f'{escape(key)}="{escape(value)}"')
+ 
+diff --git a/tests/test_filters.py b/tests/test_filters.py
+index f50ed13ab..d8e9114d0 100644
+--- a/tests/test_filters.py
++++ b/tests/test_filters.py
+@@ -474,11 +474,12 @@ def test_xmlattr(self, env):
+         assert 'bar="23"' in out
+         assert 'blub:blub="&lt;?&gt;"' in out
+ 
+-    def test_xmlattr_key_with_spaces(self, env):
+-        with pytest.raises(ValueError, match="Spaces are not allowed"):
+-            env.from_string(
+-                "{{ {'src=1 onerror=alert(1)': 'my_class'}|xmlattr }}"
+-            ).render()
++    @pytest.mark.parametrize("sep", ("\t", "\n", "\f", " ", "/", ">", "="))
++    def test_xmlattr_key_invalid(self, env: Environment, sep: str) -> None:
++        with pytest.raises(ValueError, match="Invalid character"):
++            env.from_string("{{ {key: 'my_class'}|xmlattr }}").render(
++                key=f"class{sep}onclick=alert(1)"
++            )
+ 
+     def test_sort1(self, env):
+         tmpl = env.from_string("{{ [2, 3, 1]|sort }}|{{ [2, 3, 1]|sort(true) }}")
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-h75v-3vvj-5mfj", "package": "jinja2", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

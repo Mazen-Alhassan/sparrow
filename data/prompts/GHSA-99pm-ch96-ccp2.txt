@@ -1,0 +1,95 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-99pm-ch96-ccp2 (CVE-2025-32962, GHSA-99pm-ch96-ccp2, PYSEC-2026-1379)
+Package: flask-appbuilder 4.3.10
+Fixed in: 4.6.2
+Severity: moderate
+
+Summary: Flask-AppBuilder open redirect vulnerability using HTTP host injection
+
+Details:
+### Impact
+Flask-AppBuilder prior to 4.6.2 would allow for a malicious unauthenticated actor to perform an open redirect by manipulating the Host header in HTTP requests.
+ 
+### Patches
+Flask-AppBuilder 4.6.2 introduced the `FAB_SAFE_REDIRECT_HOSTS` configuration variable, which allows administrators to explicitly define which domains are considered safe for redirection.
+
+Examples:
+```
+FAB_SAFE_REDIRECT_HOSTS = ["yourdomain.com", "sub.yourdomain.com", "*.yourcompany.com"]
+```
+
+### Workarounds
+Use a Reverse Proxy to Enforce Trusted Host Headers
+
+### References
+_Are there any links users can visit to find out more?_
+
+References:
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/security/advisories/GHSA-99pm-ch96-ccp2
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-32962
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/commit/32eedbbb5cb483a3e782c5f2732de4a6a650d9b6
+- PACKAGE: https://github.com/dpgaspar/Flask-AppBuilder
+
+Fix commit, Python hunks only:
+--- https://github.com/dpgaspar/Flask-AppBuilder/commit/32eedbbb5cb483a3e782c5f2732de4a6a650d9b6.patch ---
+diff --git a/flask_appbuilder/utils/base.py b/flask_appbuilder/utils/base.py
+index 406f157887..3398f6a4ed 100644
+--- a/flask_appbuilder/utils/base.py
++++ b/flask_appbuilder/utils/base.py
+@@ -29,7 +29,7 @@ def is_safe_redirect_url(url: str) -> bool:
+         scheme = "http"
+     valid_schemes = ["http", "https"]
+ 
+-    safe_hosts = current_app.config.get("SAFE_REDIRECT_HOSTS", [])
++    safe_hosts = current_app.config.get("FAB_SAFE_REDIRECT_HOSTS", [])
+     if not safe_hosts:
+         safe_hosts = [urlparse(request.host_url).netloc]
+ 
+diff --git a/tests/security/test_mvc_security.py b/tests/security/test_mvc_security.py
+index d2fec430a9..b0a6bcde45 100644
+--- a/tests/security/test_mvc_security.py
++++ b/tests/security/test_mvc_security.py
+@@ -249,7 +249,7 @@ def test_login_next_url_spoofed_host_header_disallowed(self):
+         """
+         Ensure a spoofed Host header does not allow redirection to an untrusted domain
+         """
+-        self.app.config["SAFE_REDIRECT_HOSTS"] = ["localhost"]  # trusted dev host
++        self.app.config["FAB_SAFE_REDIRECT_HOSTS"] = ["localhost"]  # trusted dev host
+         self.browser_logout(self.client)
+ 
+         response = self.browser_login(
+@@ -268,7 +268,7 @@ def test_login_next_url_spoofed_host_header_allowed_config(self):
+         """
+         Ensure a spoofed Host header does not allow redirection to an untrusted domain
+         """
+-        self.app.config["SAFE_REDIRECT_HOSTS"] = ["localhost"]  # trusted dev host
++        self.app.config["FAB_SAFE_REDIRECT_HOSTS"] = ["localhost"]  # trusted dev host
+         self.browser_logout(self.client)
+ 
+         response = self.browser_login(
+@@ -287,7 +287,7 @@ def test_login_next_url_allowed_config_wildcard(self):
+         """
+         Ensure a spoofed Host header does not allow redirection to an untrusted domain
+         """
+-        self.app.config["SAFE_REDIRECT_HOSTS"] = ["*.localhost"]  # trusted dev host
++        self.app.config["FAB_SAFE_REDIRECT_HOSTS"] = ["*.localhost"]  # trusted dev host
+         self.browser_logout(self.client)
+ 
+         response = self.browser_login(
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-99pm-ch96-ccp2", "package": "flask-appbuilder", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

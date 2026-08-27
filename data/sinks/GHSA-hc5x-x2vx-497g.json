@@ -1,0 +1,35 @@
+{
+  "advisory": "GHSA-hc5x-x2vx-497g",
+  "package": "gunicorn",
+  "sinks": [
+    "gunicorn.http.message.Request.read",
+    "gunicorn.http.message.Message.parse_headers"
+  ],
+  "confidence": "low",
+  "evidence": "pull request 3113 is large; the Python hunks visible in the prompt only add new Setting classes to gunicorn/config.py, so the parsing change was inferred from the advisory text",
+  "assumptions": [
+    "the request smuggling fix is in the header parsing in gunicorn/http/message.py, which the truncated diff does not show",
+    "method names were inferred from gunicorn's structure",
+    "the sink may be a new helper that does not exist in 21.2.0"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "gunicorn.http.message.Request.read": {
+      "status": "absent_in_vulnerable",
+      "present_in_vulnerable": false,
+      "changed_in_fixed": false,
+      "vulnerable_version": "21.2.0",
+      "fixed_version": "22.0.0",
+      "note": "gunicorn.http.message.Request.read does not exist in gunicorn 21.2.0"
+    },
+    "gunicorn.http.message.Message.parse_headers": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "21.2.0",
+      "fixed_version": "22.0.0",
+      "note": "body differs between 21.2.0 and 22.0.0",
+      "location": "gunicorn.http.message:Message.parse_headers"
+    }
+  }
+}

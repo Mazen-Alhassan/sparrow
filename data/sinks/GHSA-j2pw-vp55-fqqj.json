@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-j2pw-vp55-fqqj",
+  "package": "flask-appbuilder",
+  "sinks": [
+    "flask_appbuilder.security.views.AuthOIDView.login_handler"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 6336456 changes login_handler in flask_appbuilder/security/views.py to look the provider up instead of passing form.openid.data straight to oid.try_login",
+  "assumptions": [
+    "assumes the enclosing class is AuthOIDView, which the hunk header does not name",
+    "get_oid_identity_url is new in the fix and cannot be a sink in 4.3.10"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "flask_appbuilder.security.views.AuthOIDView.login_handler": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "4.3.10",
+      "fixed_version": "4.3.11",
+      "note": "body differs between 4.3.10 and 4.3.11",
+      "location": "flask_appbuilder.security.views:AuthOIDView.login.<locals>.login_handler"
+    }
+  }
+}

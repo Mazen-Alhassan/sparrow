@@ -1,0 +1,201 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-q2x7-8rv6-6q7h (CVE-2024-56326, GHSA-q2x7-8rv6-6q7h, PYSEC-2026-1475)
+Package: jinja2 3.1.2
+Fixed in: 3.1.5
+Severity: moderate
+
+Summary: Jinja has a sandbox breakout through indirect reference to format method
+
+Details:
+An oversight in how the Jinja sandboxed environment detects calls to `str.format` allows an attacker that controls the content of a template to execute arbitrary Python code.
+
+To exploit the vulnerability, an attacker needs to control the content of a template. Whether that is the case depends on the type of application using Jinja. This vulnerability impacts users of applications which execute untrusted templates.
+
+Jinja's sandbox does catch calls to `str.format` and ensures they don't escape the sandbox. However, it's possible to store a reference to a malicious string's `format` method, then pass that to a filter that calls it. No such filters are built-in to Jinja, but could be present through custom filters in an application. After the fix, such indirect calls are also handled by the sandbox.
+
+References:
+- WEB: https://github.com/pallets/jinja/security/advisories/GHSA-q2x7-8rv6-6q7h
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-56326
+- WEB: https://github.com/pallets/jinja/commit/48b0687e05a5466a91cd5812d604fa37ad0943b4
+- PACKAGE: https://github.com/pallets/jinja
+- WEB: https://github.com/pallets/jinja/releases/tag/3.1.5
+- WEB: https://lists.debian.org/debian-lts-announce/2025/04/msg00022.html
+
+Fix commit, Python hunks only:
+--- https://github.com/pallets/jinja/commit/48b0687e05a5466a91cd5812d604fa37ad0943b4.patch ---
+diff --git a/src/jinja2/sandbox.py b/src/jinja2/sandbox.py
+index 8200195db..9c9dae22f 100644
+--- a/src/jinja2/sandbox.py
++++ b/src/jinja2/sandbox.py
+@@ -8,6 +8,7 @@
+ from _string import formatter_field_name_split  # type: ignore
+ from collections import abc
+ from collections import deque
++from functools import update_wrapper
+ from string import Formatter
+ 
+ from markupsafe import EscapeFormatter
+@@ -83,20 +84,6 @@
+ )
+ 
+ 
+-def inspect_format_method(callable: t.Callable[..., t.Any]) -> t.Optional[str]:
+-    if not isinstance(
+-        callable, (types.MethodType, types.BuiltinMethodType)
+-    ) or callable.__name__ not in ("format", "format_map"):
+-        return None
+-
+-    obj = callable.__self__
+-
+-    if isinstance(obj, str):
+-        return obj
+-
+-    return None
+-
+-
+ def safe_range(*args: int) -> range:
+     """A range that can't generate ranges with a length of more than
+     MAX_RANGE items.
+@@ -316,6 +303,9 @@ def getitem(
+                     except AttributeError:
+                         pass
+                     else:
++                        fmt = self.wrap_str_format(value)
++                        if fmt is not None:
++                            return fmt
+                         if self.is_safe_attribute(obj, argument, value):
+                             return value
+                         return self.unsafe_undefined(obj, argument)
+@@ -333,6 +323,9 @@ def getattr(self, obj: t.Any, attribute: str) -> t.Union[t.Any, Undefined]:
+             except (TypeError, LookupError):
+                 pass
+         else:
++            fmt = self.wrap_str_format(value)
++            if fmt is not None:
++                return fmt
+             if self.is_safe_attribute(obj, attribute, value):
+                 return value
+             return self.unsafe_undefined(obj, attribute)
+@@ -348,34 +341,49 @@ def unsafe_undefined(self, obj: t.Any, attribute: str) -> Undefined:
+             exc=SecurityError,
+         )
+ 
+-    def format_string(
+-        self,
+-        s: str,
+-        args: t.Tuple[t.Any, ...],
+-        kwargs: t.Dict[str, t.Any],
+-        format_func: t.Optional[t.Callable[..., t.Any]] = None,
+-    ) -> str:
+-        """If a format call is detected, then this is routed through this
+-        method so that our safety sandbox can be used for it.
++    def wrap_str_format(self, value: t.Any) -> t.Optional[t.Callable[..., str]]:
++        """If the given value is a ``str.format`` or ``str.format_map`` method,
++        return a new function than handles sandboxing. This is done at access
++        rather than in :meth:`call`, so that calls made without ``call`` are
++        also sandboxed.
+         """
++        if not isinstance(
++            value, (types.MethodType, types.BuiltinMethodType)
++        ) or value.__name__ not in ("format", "format_map"):
++            return None
++
++        f_self: t.Any = value.__self__
++
++        if not isinstance(f_self, str):
++            return None
++
++        str_type: t.Type[str] = type(f_self)
++        is_format_map = value.__name__ == "format_map"
+         formatter: SandboxedFormatter
+-        if isinstance(s, Markup):
+-            formatter = SandboxedEscapeFormatter(self, escape=s.escape)
++
++        if isinstance(f_self, Markup):
++            formatter = SandboxedEscapeFormatter(self, escape=f_self.escape)
+         else:
+             formatter = SandboxedFormatter(self)
+ 
+-        if format_func is not None and format_func.__name__ == "format_map":
+-            if len(args) != 1 or kwargs:
+-                raise TypeError(
+-                    "format_map() takes exactly one argument"
+-                    f" {len(args) + (kwargs is not None)} given"
+-                )
++        vformat = formatter.vformat
++
++        def wrapper(*args: t.Any, **kwargs: t.Any) -> str:
++            if is_format_map:
++                if kwargs:
++                    raise TypeError("format_map() takes no keyword arguments")
++
++                if len(args) != 1:
++                    raise TypeError(
++                        f"format_map() takes exactly one argument ({len(args)} given)"
++                    )
++
++                kwargs = args[0]
++                args = ()
+ 
+-            kwargs = args[0]
+-            args = ()
++            return str_type(vformat(f_self, args, kwargs))
+ 
+-        rv = formatter.vformat(s, args, kwargs)
+-        return type(s)(rv)
++        return update_wrapper(wrapper, value)
+ 
+     def call(
+         __self,  # noqa: B902
+@@ -385,9 +393,6 @@ def call(
+         **kwargs: t.Any,
+     ) -> t.Any:
+         """Call an object from sandboxed code."""
+-        fmt = inspect_format_method(__obj)
+-        if fmt is not None:
+-            return __self.format_string(fmt, args, kwargs, __obj)
+ 
+         # the double prefixes are to avoid double keyword argument
+         # errors when proxying the call.
+diff --git a/tests/test_security.py b/tests/test_security.py
+index 9c7c4427a..864d5f7f9 100644
+--- a/tests/test_security.py
++++ b/tests/test_security.py
+@@ -173,3 +173,20 @@ def test_safe_format_all_okay(self):
+             '{{ ("a{x.foo}b{y}"|safe).format_map({"x":{"foo": 42}, "y":"<foo>"}) }}'
+         )
+         assert t.render() == "a42b&lt;foo&gt;"
++
++    def test_indirect_call(self):
++        def run(value, arg):
++            return value.run(arg)
++
++        env = SandboxedEnvironment()
++        env.filters["run"] = run
++        t = env.from_string(
++            """{% set
++                ns = namespace(run="{0.__call__.__builtins__[__import__]}".format)
++            %}
++            {{ ns | run(not_here) }}
++            """
++        )
++
++        with pytest.raises(SecurityError):
++            t.render()
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-q2x7-8rv6-6q7h", "package": "jinja2", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-2m57-hf25-phgg",
+  "package": "sqlparse",
+  "sinks": [
+    "sqlparse.sql.TokenList.flatten"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit b4a39d9 wraps the recursive loop in TokenList.flatten with a RecursionError guard",
+  "assumptions": [
+    "assumes the recursion depth is exhausted inside flatten, although the traceback in the advisory shows the recursion starting in grouping._group_matching and sql.group_tokens"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "sqlparse.sql.TokenList.flatten": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.4.4",
+      "fixed_version": "0.5.0",
+      "note": "body differs between 0.4.4 and 0.5.0",
+      "location": "sqlparse.sql:TokenList.flatten"
+    }
+  }
+}

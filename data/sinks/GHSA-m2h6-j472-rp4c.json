@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-m2h6-j472-rp4c",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the name constraint matcher DNSConstraint::matches is Rust code inside the compiled extension",
+  "assumptions": [
+    "assumes a Rust-side fix has no Python sink"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

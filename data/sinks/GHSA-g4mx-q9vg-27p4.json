@@ -1,0 +1,36 @@
+{
+  "advisory": "GHSA-g4mx-q9vg-27p4",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.connectionpool.HTTPConnectionPool.urlopen",
+    "urllib3.poolmanager.PoolManager.urlopen"
+  ],
+  "confidence": "medium",
+  "evidence": "fix commit 4e50fbc adds _prepare_for_method_change and calls it from the redirect handling in connectionpool.py and poolmanager.py",
+  "assumptions": [
+    "_prepare_for_method_change is new in the fix so it cannot be the sink in 1.26.6",
+    "assumes the redirect handling that drops the body lives in urlopen in both modules",
+    "the 1.26 backport is a different commit than the 2.x one shown"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.connectionpool.HTTPConnectionPool.urlopen": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "1.26.18",
+      "note": "body differs between 1.26.6 and 1.26.18",
+      "location": "urllib3.connectionpool:HTTPConnectionPool.urlopen"
+    },
+    "urllib3.poolmanager.PoolManager.urlopen": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "1.26.18",
+      "note": "body differs between 1.26.6 and 1.26.18",
+      "location": "urllib3.poolmanager:PoolManager.urlopen"
+    }
+  }
+}

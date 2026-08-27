@@ -1,0 +1,12 @@
+{
+  "advisory": "PYSEC-2023-206",
+  "package": "selenium",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the linked fix is in the Java Selenium server, not in the Python client package",
+  "assumptions": [
+    "assumes no Python function in the selenium package is affected"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

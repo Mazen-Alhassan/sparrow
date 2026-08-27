@@ -1,0 +1,111 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-h5c8-rqwp-cp95 (CVE-2024-22195, GHSA-h5c8-rqwp-cp95, PYSEC-2026-1473)
+Package: jinja2 3.1.2
+Fixed in: 3.1.3
+Severity: moderate
+
+Summary: Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter
+
+Details:
+The `xmlattr` filter in affected versions of Jinja accepts keys containing spaces. XML/HTML attributes cannot contain spaces, as each would then be interpreted as a separate attribute. If an application accepts keys (as opposed to only values) as user input, and renders these in pages that other users see as well, an attacker could use this to inject other attributes and perform XSS. Note that accepting keys as user input is not common or a particularly intended use case of the `xmlattr` filter, and an application doing so should already be verifying what keys are provided regardless of this fix.
+
+References:
+- WEB: https://github.com/pallets/jinja/security/advisories/GHSA-h5c8-rqwp-cp95
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-22195
+- WEB: https://github.com/pallets/jinja/commit/716795349a41d4983a9a4771f7d883c96ea17be7
+- PACKAGE: https://github.com/pallets/jinja
+- WEB: https://github.com/pallets/jinja/releases/tag/3.1.3
+- WEB: https://lists.debian.org/debian-lts-announce/2024/01/msg00010.html
+- WEB: https://lists.debian.org/debian-lts-announce/2024/12/msg00009.html
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/5XCWZD464AJJJUBOO7CMPXQ4ROBC6JX2
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/DELCVUUYX75I5K4Q5WMJG4MUZJA6VAIP
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/O7YWRBX6JQCWC2XXCTZ55C7DPMGICCN3
+
+Fix commit, Python hunks only:
+--- https://github.com/pallets/jinja/commit/716795349a41d4983a9a4771f7d883c96ea17be7.patch ---
+diff --git a/src/jinja2/filters.py b/src/jinja2/filters.py
+index ed07c4c0e..c7ecc9bb6 100644
+--- a/src/jinja2/filters.py
++++ b/src/jinja2/filters.py
+@@ -248,13 +248,17 @@ def do_items(value: t.Union[t.Mapping[K, V], Undefined]) -> t.Iterator[t.Tuple[K
+     yield from value.items()
+ 
+ 
++_space_re = re.compile(r"\s", flags=re.ASCII)
++
++
+ @pass_eval_context
+ def do_xmlattr(
+     eval_ctx: "EvalContext", d: t.Mapping[str, t.Any], autospace: bool = True
+ ) -> str:
+     """Create an SGML/XML attribute string based on the items in a dict.
+-    All values that are neither `none` nor `undefined` are automatically
+-    escaped:
++
++    If any key contains a space, this fails with a ``ValueError``. Values that
++    are neither ``none`` nor ``undefined`` are automatically escaped.
+ 
+     .. sourcecode:: html+jinja
+ 
+@@ -273,12 +277,22 @@ def do_xmlattr(
+ 
+     As you can see it automatically prepends a space in front of the item
+     if the filter returned something unless the second parameter is false.
++
++    .. versionchanged:: 3.1.3
++        Keys with spaces are not allowed.
+     """
+-    rv = " ".join(
+-        f'{escape(key)}="{escape(value)}"'
+-        for key, value in d.items()
+-        if value is not None and not isinstance(value, Undefined)
+-    )
++    items = []
++
++    for key, value in d.items():
++        if value is None or isinstance(value, Undefined):
++            continue
++
++        if _space_re.search(key) is not None:
++            raise ValueError(f"Spaces are not allowed in attributes: '{key}'")
++
++        items.append(f'{escape(key)}="{escape(value)}"')
++
++    rv = " ".join(items)
+ 
+     if autospace and rv:
+         rv = " " + rv
+diff --git a/tests/test_filters.py b/tests/test_filters.py
+index 32897c546..f50ed13ab 100644
+--- a/tests/test_filters.py
++++ b/tests/test_filters.py
+@@ -474,6 +474,12 @@ def test_xmlattr(self, env):
+         assert 'bar="23"' in out
+         assert 'blub:blub="&lt;?&gt;"' in out
+ 
++    def test_xmlattr_key_with_spaces(self, env):
++        with pytest.raises(ValueError, match="Spaces are not allowed"):
++            env.from_string(
++                "{{ {'src=1 onerror=alert(1)': 'my_class'}|xmlattr }}"
++            ).render()
++
+     def test_sort1(self, env):
+         tmpl = env.from_string("{{ [2, 3, 1]|sort }}|{{ [2, 3, 1]|sort(true) }}")
+         assert tmpl.render() == "[1, 2, 3]|[3, 2, 1]"
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-h5c8-rqwp-cp95", "package": "jinja2", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

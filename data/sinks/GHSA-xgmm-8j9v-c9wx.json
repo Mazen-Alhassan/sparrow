@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-xgmm-8j9v-c9wx",
+  "package": "pyjwt",
+  "sinks": [
+    "jwt.algorithms.HMACAlgorithm.prepare_key"
+  ],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked; the advisory quotes HMACAlgorithm.prepare_key as the function whose checks are incomplete",
+  "assumptions": [
+    "the function was read from the advisory's quoted source, not from a diff",
+    "the fix may add a JWK check in from_jwk or in PyJWS.decode instead"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "jwt.algorithms.HMACAlgorithm.prepare_key": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.4.0",
+      "fixed_version": "2.13.0",
+      "note": "body differs between 2.4.0 and 2.13.0",
+      "location": "jwt.algorithms:HMACAlgorithm.prepare_key"
+    }
+  }
+}

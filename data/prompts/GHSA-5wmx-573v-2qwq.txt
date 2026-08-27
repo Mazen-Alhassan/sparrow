@@ -1,0 +1,87 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-5wmx-573v-2qwq (CVE-2025-69534, GHSA-5wmx-573v-2qwq, PYSEC-2026-89)
+Package: markdown 3.3.4
+Fixed in: 3.8.1
+Severity: moderate
+
+Summary: Python-Markdown has an Uncaught Exception
+
+Details:
+Python-Markdown version 3.8 contain a vulnerability where malformed HTML-like sequences can cause html.parser.HTMLParser to raise an unhandled AssertionError during Markdown parsing. Because Python-Markdown does not catch this exception, any application that processes attacker-controlled Markdown may crash. This enables remote, unauthenticated Denial of Service in web applications, documentation systems, CI/CD pipelines, and any service that renders untrusted Markdown. The issue was acknowledged by the vendor and fixed in version 3.8.1. This issue causes a remote Denial of Service in any application parsing untrusted Markdown, and can lead to Information Disclosure through uncaught exceptions.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-69534
+- WEB: https://github.com/Python-Markdown/markdown/issues/1534
+- WEB: https://github.com/Python-Markdown/markdown/pull/1535
+- WEB: https://github.com/Python-Markdown/markdown
+- WEB: https://github.com/Python-Markdown/markdown/actions/runs/15736122892
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/markdown/PYSEC-2026-89.yaml
+- WEB: http://www.openwall.com/lists/oss-security/2026/03/06/4
+
+Fix commit, Python hunks only:
+--- https://github.com/Python-Markdown/markdown/pull/1535.diff ---
+diff --git a/markdown/extensions/md_in_html.py b/markdown/extensions/md_in_html.py
+index ba73c9425..5256e9046 100644
+--- a/markdown/extensions/md_in_html.py
++++ b/markdown/extensions/md_in_html.py
+@@ -280,6 +280,10 @@ def parse_pi(self, i: int) -> int:
+ 
+     def parse_html_declaration(self, i: int) -> int:
+         if self.at_line_start() or self.intail or self.mdstack:
++            if self.rawdata[i:i+3] == '<![' and not self.rawdata[i:i+9] == '<![CDATA[':
++                # We have encountered the bug in #1534 (Python bug `gh-77057`).
++                # Provide an override until we drop support for Python < 3.13.
++                return self.parse_bogus_comment(i)
+             # The same override exists in `HTMLExtractor` without the check
+             # for `mdstack`. Therefore, use parent of `HTMLExtractor` instead.
+             return super(HTMLExtractor, self).parse_html_declaration(i)
+diff --git a/markdown/htmlparser.py b/markdown/htmlparser.py
+index 1528325c5..b357e7084 100644
+--- a/markdown/htmlparser.py
++++ b/markdown/htmlparser.py
+@@ -275,6 +275,10 @@ def parse_pi(self, i: int) -> int:
+ 
+     def parse_html_declaration(self, i: int) -> int:
+         if self.at_line_start() or self.intail:
++            if self.rawdata[i:i+3] == '<![' and not self.rawdata[i:i+9] == '<![CDATA[':
++                # We have encountered the bug in #1534 (Python bug `gh-77057`).
++                # Provide an override until we drop support for Python < 3.13.
++                return self.parse_bogus_comment(i)
+             return super().parse_html_declaration(i)
+         # This is not the beginning of a raw block so treat as plain data
+         # and avoid consuming any tags which may follow (see #1066).
+diff --git a/tests/test_syntax/blocks/test_html_blocks.py b/tests/test_syntax/blocks/test_html_blocks.py
+index 8ea3904c0..18dc11458 100644
+--- a/tests/test_syntax/blocks/test_html_blocks.py
++++ b/tests/test_syntax/blocks/test_html_blocks.py
+@@ -1275,6 +1275,13 @@ def test_raw_cdata_indented(self):
+             )
+         )
+ 
++    def test_not_actually_cdata(self):
++        # Ensure bug reported in #1534 is avoided.
++        self.assertMarkdownRenders(
++            '<![',
++            '<p>&lt;![</p>'
++        )
++
+     def test_raw_cdata_code_span(self):
+         self.assertMarkdownRenders(
+             self.dedent(
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-5wmx-573v-2qwq", "package": "markdown", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

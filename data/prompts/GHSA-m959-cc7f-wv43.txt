@@ -1,0 +1,51 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-m959-cc7f-wv43 (CVE-2026-34073, GHSA-m959-cc7f-wv43, PYSEC-2026-35)
+Package: cryptography 41.0.2
+Fixed in: 46.0.6
+Severity: low
+
+Summary: cryptography has incomplete DNS name constraint enforcement on peer names
+
+Details:
+## Summary
+
+In versions of cryptography prior to 46.0.5, DNS name constraints were only validated against SANs within child certificates, and not the "peer name" presented during each validation. Consequently, cryptography would allow a peer named `bar.example.com` to validate against a wildcard leaf certificate for `*.example.com`, even if the leaf's parent certificate (or upwards) contained an excluded subtree constraint for `bar.example.com`.
+
+This behavior resulted from a gap between RFC 5280 (which defines Name Constraint semantics) and RFC 9525 (which defines service identity semantics): put together, neither states definitively whether Name Constraints should be applied to peer names. To close this gap, cryptography now conservatively rejects any validation where the peer name would be rejected by a name constraint if it were a SAN instead.
+
+In practice, exploitation of this bypass requires an uncommon X.509 topology, one that the Web PKI avoids because it exhibits these kinds of problems. Consequently, we consider this a medium-to-low impact severity.
+
+See CVE-2025-61727 for a similar bypass in Go's `crypto/x509`.
+
+## Remediation
+
+Users should upgrade to 46.0.6 or newer. 
+
+## Attribution
+
+Reporter: @1seal
+
+References:
+- WEB: https://github.com/pyca/cryptography/security/advisories/GHSA-m959-cc7f-wv43
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-34073
+- PACKAGE: https://github.com/pyca/cryptography
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/cryptography/PYSEC-2026-35.yaml
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-m959-cc7f-wv43", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

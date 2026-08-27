@@ -1,0 +1,152 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-765j-9r45-w2q2 (CVE-2025-58065, GHSA-765j-9r45-w2q2, PYSEC-2026-1378)
+Package: flask-appbuilder 4.3.10
+Fixed in: 4.8.1
+Severity: moderate
+
+Summary: Flask App Builder has an Authentication Bypass vulnerability when using non AUTH_DB methods
+
+Details:
+### Impact
+When Flask-AppBuilder is configured to use OAuth, LDAP, or other non-database authentication methods, the password reset endpoint remains registered and accessible, despite not being displayed in the user interface. This allows an enabled user to reset their password and be able to create JWT tokens even after the user is disabled on the authentication provider.
+
+### Patches
+Upgrade to Flask-AppBuilder version 4.8.1 or later
+
+### Workarounds
+If immediate upgrade is not possible:
+- Manually disable password reset routes in the application configuration
+- Implement additional access controls at the web server or proxy level to block access to the reset my password URL.
+- Monitor for suspicious password reset attempts from disabled accounts
+
+References:
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/security/advisories/GHSA-765j-9r45-w2q2
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-58065
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/pull/2384
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/commit/a942a9cc5775752f9a02f97fd8198dd288fa93ee
+- PACKAGE: https://github.com/dpgaspar/Flask-AppBuilder
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/releases/tag/v4.8.1
+
+Fix commit, Python hunks only:
+--- https://github.com/dpgaspar/Flask-AppBuilder/pull/2384.diff ---
+diff --git a/flask_appbuilder/security/manager.py b/flask_appbuilder/security/manager.py
+index 3ca995f2f7..68614b1721 100644
+--- a/flask_appbuilder/security/manager.py
++++ b/flask_appbuilder/security/manager.py
+@@ -813,13 +813,13 @@ def register_views(self):
+             if self.registeruser_view:
+                 self.appbuilder.add_view_no_menu(self.registeruser_view)
+ 
+-        self.appbuilder.add_view_no_menu(self.resetpasswordview())
+-        self.appbuilder.add_view_no_menu(self.resetmypasswordview())
+         self.appbuilder.add_view_no_menu(self.userinfoeditview())
+ 
+         if self.auth_type == AUTH_DB:
+             self.user_view = self.userdbmodelview
+             self.auth_view = self.authdbview()
++            self.appbuilder.add_view_no_menu(self.resetpasswordview())
++            self.appbuilder.add_view_no_menu(self.resetmypasswordview())
+ 
+         elif self.auth_type == AUTH_LDAP:
+             self.user_view = self.userldapmodelview
+diff --git a/tests/security/test_auth_oauth.py b/tests/security/test_auth_oauth.py
+index 4c815eb571..9b70c53c39 100644
+--- a/tests/security/test_auth_oauth.py
++++ b/tests/security/test_auth_oauth.py
+@@ -695,6 +695,26 @@ def test_oauth_user_info_auth0(self):
+             },
+         )
+ 
++    def test_reset_password_view_not_registered_with_oauth(self):
++        """
++        OAUTH: test that ResetMyPasswordView is not registered when using OAuth
++        authentication
++        """
++        self.appbuilder = AppBuilder(self.app, self.db.session)
++
++        for view in self.appbuilder.baseviews:
++            if view.__class__.__name__ == "ResetMyPasswordView":
++                self.fail(
++                    "ResetMyPasswordView should not be registered when using OAuth "
++                    "authentication"
++                )
++
++        # Also verify that the view is not accessible via URL
++        with self.app.test_client() as client:
++            response = client.get("/resetmypassword/form")
++            # Should return 404 since the view is not registered
++            self.assertEqual(response.status_code, 404)
++
+ 
+ class OAuthAuthentikTestCase(unittest.TestCase):
+     def setUp(self):
+
+--- https://github.com/dpgaspar/Flask-AppBuilder/commit/a942a9cc5775752f9a02f97fd8198dd288fa93ee.patch ---
+diff --git a/flask_appbuilder/security/manager.py b/flask_appbuilder/security/manager.py
+index 3ca995f2f7..68614b1721 100644
+--- a/flask_appbuilder/security/manager.py
++++ b/flask_appbuilder/security/manager.py
+@@ -813,13 +813,13 @@ def register_views(self):
+             if self.registeruser_view:
+                 self.appbuilder.add_view_no_menu(self.registeruser_view)
+ 
+-        self.appbuilder.add_view_no_menu(self.resetpasswordview())
+-        self.appbuilder.add_view_no_menu(self.resetmypasswordview())
+         self.appbuilder.add_view_no_menu(self.userinfoeditview())
+ 
+         if self.auth_type == AUTH_DB:
+             self.user_view = self.userdbmodelview
+             self.auth_view = self.authdbview()
++            self.appbuilder.add_view_no_menu(self.resetpasswordview())
++            self.appbuilder.add_view_no_menu(self.resetmypasswordview())
+ 
+         elif self.auth_type == AUTH_LDAP:
+             self.user_view = self.userldapmodelview
+diff --git a/tests/security/test_auth_oauth.py b/tests/security/test_auth_oauth.py
+index 4c815eb571..9b70c53c39 100644
+--- a/tests/security/test_auth_oauth.py
++++ b/tests/security/test_auth_oauth.py
+@@ -695,6 +695,26 @@ def test_oauth_user_info_auth0(self):
+             },
+         )
+ 
++    def test_reset_password_view_not_registered_with_oauth(self):
++        """
++        OAUTH: test that ResetMyPasswordView is not registered when using OAuth
++        authentication
++        """
++        self.appbuilder = AppBuilder(self.app, self.db.session)
++
++        for view in self.appbuilder.baseviews:
++            if view.__class__.__name__ == "ResetMyPasswordView":
++                self.fail(
++                    "ResetMyPasswordView should not be registered when using OAuth "
++                    "authentication"
++                )
++
++        # Also verify that the view is not accessible via URL
++        with self.app.test_client() as client:
++            response = client.get("/resetmypassword/form")
++            # Should return 404 since the view is not registered
++            self.assertEqual(response.status_code, 404)
++
+ 
+ class OAuthAuthentikTestCase(unittest.TestCase):
+     def setUp(self):
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-765j-9r45-w2q2", "package": "flask-appbuilder", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

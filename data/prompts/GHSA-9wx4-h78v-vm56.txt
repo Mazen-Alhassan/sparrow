@@ -1,0 +1,273 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-9wx4-h78v-vm56 (CVE-2024-35195, GHSA-9wx4-h78v-vm56, PYSEC-2026-1873)
+Package: requests 2.31.0
+Fixed in: 2.32.0
+Severity: moderate
+
+Summary: Requests `Session` object does not verify requests after making first request with verify=False
+
+Details:
+When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.
+
+This occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.
+
+This behavior affects versions of `requests` prior to 2.32.0.
+
+References:
+- WEB: https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-35195
+- WEB: https://github.com/psf/requests/pull/6655
+- WEB: https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac
+- PACKAGE: https://github.com/psf/requests
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/IYLSNK5TL46Q6XPRVMHVWS63MVJQOK4Q
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/N7WP6EYDSUOCOJYHDK5NX43PYZ4SNHGZ
+
+Fix commit, Python hunks only:
+--- https://github.com/psf/requests/pull/6655.diff ---
+diff --git a/src/requests/adapters.py b/src/requests/adapters.py
+index fc5606bdcb..6c62766639 100644
+--- a/src/requests/adapters.py
++++ b/src/requests/adapters.py
+@@ -8,6 +8,7 @@
+ 
+ import os.path
+ import socket  # noqa: F401
++import typing
+ 
+ from urllib3.exceptions import ClosedPoolError, ConnectTimeoutError
+ from urllib3.exceptions import HTTPError as _HTTPError
+@@ -61,12 +62,38 @@ def SOCKSProxyManager(*args, **kwargs):
+         raise InvalidSchema("Missing dependencies for SOCKS support.")
+ 
+ 
++if typing.TYPE_CHECKING:
++    from .models import PreparedRequest
++
++
+ DEFAULT_POOLBLOCK = False
+ DEFAULT_POOLSIZE = 10
+ DEFAULT_RETRIES = 0
+ DEFAULT_POOL_TIMEOUT = None
+ 
+ 
++def _urllib3_request_context(
++    request: "PreparedRequest", verify: "bool | str | None"
++) -> "(typing.Dict[str, typing.Any], typing.Dict[str, typing.Any])":
++    host_params = {}
++    pool_kwargs = {}
++    parsed_request_url = urlparse(request.url)
++    scheme = parsed_request_url.scheme.lower()
++    port = parsed_request_url.port
++    cert_reqs = "CERT_REQUIRED"
++    if verify is False:
++        cert_reqs = "CERT_NONE"
++    if isinstance(verify, str):
++        pool_kwargs["ca_certs"] = verify
++    pool_kwargs["cert_reqs"] = cert_reqs
++    host_params = {
++        "scheme": scheme,
++        "host": parsed_request_url.hostname,
++        "port": port,
++    }
++    return host_params, pool_kwargs
++
++
+ class BaseAdapter:
+     """The Base Transport Adapter"""
+ 
+@@ -327,6 +354,35 @@ def build_response(self, req, resp):
+ 
+         return response
+ 
++    def _get_connection(self, request, verify, proxies=None):
++        # Replace the existing get_connection without breaking things and
++        # ensure that TLS settings are considered when we interact with
++        # urllib3 HTTP Pools
++        proxy = select_proxy(request.url, proxies)
++        try:
++            host_params, pool_kwargs = _urllib3_request_context(request, verify)
++        except ValueError as e:
++            raise InvalidURL(e, request=request)
++        if proxy:
++            proxy = prepend_scheme_if_needed(proxy, "http")
++            proxy_url = parse_url(proxy)
++            if not proxy_url.host:
++                raise InvalidProxyURL(
++                    "Please check proxy URL. It is malformed "
++                    "and could be missing the host."
++                )
++            proxy_manager = self.proxy_manager_for(proxy)
++            conn = proxy_manager.connection_from_host(
++                **host_params, pool_kwargs=pool_kwargs
++            )
++        else:
++            # Only scheme should be lower case
++            conn = self.poolmanager.connection_from_host(
++                **host_params, pool_kwargs=pool_kwargs
++            )
++
++        return conn
++
+     def get_connection(self, url, proxies=None):
+         """Returns a urllib3 connection for the given URL. This should not be
+         called from user code, and is only exposed for use when subclassing the
+@@ -453,7 +509,7 @@ def send(
+         """
+ 
+         try:
+-            conn = self.get_connection(request.url, proxies)
++            conn = self._get_connection(request, verify, proxies)
+         except LocationValueError as e:
+             raise InvalidURL(e, request=request)
+ 
+diff --git a/tests/test_requests.py b/tests/test_requests.py
+index 32b5e6700c..d5cc13c79f 100644
+--- a/tests/test_requests.py
++++ b/tests/test_requests.py
+@@ -2828,6 +2828,13 @@ def test_status_code_425(self):
+         assert r5 == 425
+         assert r6 == 425
+ 
++    def test_different_connection_pool_for_tls_settings(self):
++        s = requests.Session()
++        r1 = s.get("https://invalid.badssl.com", verify=False)
++        assert r1.status_code == 421
++        with pytest.raises(requests.exceptions.SSLError):
++            s.get("https://invalid.badssl.com")
++
+ 
+ def test_json_decode_errors_are_serializable_deserializable():
+     json_decode_error = requests.exceptions.JSONDecodeError(
+
+--- https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac.patch ---
+diff --git a/src/requests/adapters.py b/src/requests/adapters.py
+index fc5606bdcb..6c62766639 100644
+--- a/src/requests/adapters.py
++++ b/src/requests/adapters.py
+@@ -8,6 +8,7 @@
+ 
+ import os.path
+ import socket  # noqa: F401
++import typing
+ 
+ from urllib3.exceptions import ClosedPoolError, ConnectTimeoutError
+ from urllib3.exceptions import HTTPError as _HTTPError
+@@ -61,12 +62,38 @@ def SOCKSProxyManager(*args, **kwargs):
+         raise InvalidSchema("Missing dependencies for SOCKS support.")
+ 
+ 
++if typing.TYPE_CHECKING:
++    from .models import PreparedRequest
++
++
+ DEFAULT_POOLBLOCK = False
+ DEFAULT_POOLSIZE = 10
+ DEFAULT_RETRIES = 0
+ DEFAULT_POOL_TIMEOUT = None
+ 
+ 
++def _urllib3_request_context(
++    request: "PreparedRequest", verify: "bool | str | None"
++) -> "(typing.Dict[str, typing.Any], typing.Dict[str, typing.Any])":
++    host_params = {}
++    pool_kwargs = {}
++    parsed_request_url = urlparse(request.url)
++    scheme = parsed_request_url.scheme.lower()
++    port = parsed_request_url.port
++    cert_reqs = "CERT_REQUIRED"
++    if verify is False:
++        cert_reqs = "CERT_NONE"
++    if isinstance(verify, str):
++        pool_kwargs["ca_certs"] = verify
++    pool_kwargs["cert_reqs"] = cert_reqs
++    host_params = {
++        "scheme": scheme,
++        "host": parsed_request_url.hostname,
++        "port": port,
++    }
++    return host_params, pool_kwargs
++
++
+ class BaseAdapter:
+     """The Base Transport Adapter"""
+ 
+@@ -327,6 +354,35 @@ def build_response(self, req, resp):
+ 
+         return response
+ 
++    def _get_connection(self, request, verify, proxies=None):
++        # Replace the existing get_connection without breaking things and
++        # ensure that TLS settings are considered when we interact with
++        # urllib3 HTTP Pools
++        proxy = select_proxy(request.url, proxies)
++        try:
++            host_params, pool_kwargs = _urllib3_request_context(request, verify)
++        except ValueError as e:
++            raise InvalidURL(e, request=request)
++        if proxy:
++            proxy = prepend_scheme_if_needed(proxy, "http")
++            proxy_url = parse_url(proxy)
++            if not proxy_url.host:
++                raise InvalidProxyURL(
++                    "Please check proxy URL. It is malformed "
++                    "and could be missing the host."
++                )
++            proxy_manager = self.proxy_manager_for(proxy)
++            conn = proxy_manager.connection_from_host(
++                **host_params, pool_kwargs=pool_kwargs
++            )
++        else:
++            # Only scheme should be lower case
++            conn = self.poolmanager.connection_from_host(
++                **host_params, pool_kwargs=pool_kwargs
++            )
++
++        return conn
++
+     def get_connection(self, url, proxies=None):
+         """Returns a urllib3 connection for the given URL. This should not be
+         called from user code, and is only exposed for use when subclassing the
+@@ -453,7 +509,7 @@ def send(
+         """
+ 
+         try:
+-            conn = self.get_connection(request.url, proxies)
++            conn = self._get_connection(request, verify, proxies)
+         except LocationValueError as e:
+             raise InvalidURL(e, request=request)
+ 
+diff --git a/tests/test_requests.py b/tests/test_requests.py
+index 32b5e6700c..d5cc13c79f 100644
+--- a/tests/test_requests.py
++++ b/tests/test_requests.py
+@@ -2828,6 +2828,13 @@ def test_status_code_425(self):
+         assert r5 == 425
+         assert r6 == 425
+ 
++    def test_different_connection_pool_for_tls_settings(self):
++        s = requests.Session()
++        r1 = s.get("https://invalid.badssl.com", verify=False)
++        assert r1.status_code == 421
++        with pytest.raises(requests.exceptions.SSLError):
++            s.get("https://invalid.badssl.com")
++
+ 
+ def test_json_decode_errors_are_serializable_deserializable():
+     json_decode_error = requests.exceptions.JSONDecodeError(
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-9wx4-h78v-vm56", "package": "requests", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

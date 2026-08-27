@@ -1,0 +1,93 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-6v7p-g79w-8964 (CVE-2026-57585, GHSA-6v7p-g79w-8964, PYSEC-2026-3625)
+Package: msgpack 1.0.2
+Fixed in: 1.2.1
+Severity: high
+
+Summary: MessagePack for Python: Out-of-bounds read / crash on Unpacker reuse after a caught error
+
+Details:
+### Impact
+
+If the Unpacker is used repeatedly after an error occurs, the process may crash with a SEGV.
+
+If the Unpacker is used repeatedly to unpack untrusted input from external sources, it may be vulnerable to a DoS attack.
+
+### Patches
+
+v1.2.1
+
+### Workarounds
+
+Users should create a new Unpacker instead of reusing the same Unpacker after an error occurs.
+
+Applying the above patch can prevent SEGV, but reusing the Streaming Unpacker after it has encountered an error will not yield correct data. If an error occurs during Streaming Unpacking, the Stream and Streaming Unpacker should be discarded.
+
+Therefore, this is not just a workaround but the correct solution. The above patch only prevents crashes from incorrect usage.
+
+References:
+- WEB: https://github.com/msgpack/msgpack-python/security/advisories/GHSA-6v7p-g79w-8964
+- WEB: https://github.com/msgpack/msgpack-python/commit/2c56ddb5d0025ed481d962c0f5d62d19dec7476d
+- PACKAGE: https://github.com/msgpack/msgpack-python
+- WEB: https://github.com/msgpack/msgpack-python/releases/tag/v1.2.1
+
+Fix commit, Python hunks only:
+--- https://github.com/msgpack/msgpack-python/commit/2c56ddb5d0025ed481d962c0f5d62d19dec7476d.patch ---
+diff --git a/test/test_except.py b/test/test_except.py
+index c04b110d..a3bf4675 100644
+--- a/test/test_except.py
++++ b/test/test_except.py
+@@ -33,6 +33,22 @@ def hook(obj):
+         object_pairs_hook=hook,
+     )
+ 
++    up = Unpacker(object_hook=hook)
++
++    def up_unpack(x):
++        up.feed(x)
++        return up.unpack()
++
++    raises(DummyException, up_unpack, packb({}))
++    raises(DummyException, up_unpack, packb({"fizz": "buzz"}))
++    raises(DummyException, up_unpack, packb({"fizz": "buzz"}))
++    raises(DummyException, up_unpack, packb({"fizz": {"buzz": "spam"}}))
++    raises(
++        DummyException,
++        up_unpack,
++        packb({"fizz": {"buzz": "spam"}}),
++    )
++
+ 
+ def test_raise_from_list_hook():
+     def hook(lst: list) -> list:
+@@ -138,3 +154,13 @@ def test_strict_map_key_with_object_pairs_hook():
+     packed = packb(valid, use_bin_type=True)
+     result = unpackb(packed, raw=False, strict_map_key=True, object_pairs_hook=list)
+     assert result == [("key", "value")]
++
++
++def test_unpacker_should_not_crash_after_exception():
++    up = Unpacker()  # default: strict_map_key=True
++    up.feed(b"\x83\x73\xc4\x00")  # fixmap(3): int key (rejected) + empty bin8
++    try:
++        up.unpack()  # ValueError: int is not allowed for map key ...
++    except Exception:
++        pass
++    up.skip()  # SIGSEGV (resumes from a corrupt parser context)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-6v7p-g79w-8964", "package": "msgpack", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

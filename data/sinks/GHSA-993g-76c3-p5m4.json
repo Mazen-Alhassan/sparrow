@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-993g-76c3-p5m4",
+  "package": "pyjwt",
+  "sinks": [
+    "jwt.jwks_client.PyJWKClient.fetch_data"
+  ],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked; the advisory says PyJWKClient passes its uri straight to urllib.request.urlopen, which happens in the client's fetch method",
+  "assumptions": [
+    "the method name fetch_data was inferred from PyJWT's structure, not read from a diff",
+    "2.4.0 may name it differently or inline the urlopen call in get_signing_key"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "jwt.jwks_client.PyJWKClient.fetch_data": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.4.0",
+      "fixed_version": "2.13.0",
+      "note": "body differs between 2.4.0 and 2.13.0",
+      "location": "jwt.jwks_client:PyJWKClient.fetch_data"
+    }
+  }
+}

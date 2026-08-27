@@ -1,0 +1,56 @@
+{
+  "advisory": "GHSA-2g68-c3qc-8985",
+  "package": "werkzeug",
+  "sinks": [
+    "werkzeug.debug.DebuggedApplication.execute_command",
+    "werkzeug.debug.DebuggedApplication.debug_application",
+    "werkzeug.debug.DebuggedApplication.pin_auth",
+    "werkzeug.debug.DebuggedApplication.__call__"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 3386395 and its follow-up add check_host_trust guards to execute_command, display_console and pin_auth, and set trusted_hosts in __call__",
+  "assumptions": [
+    "assumes the module path is werkzeug.debug, which is a package __init__.py",
+    "check_host_trust does not exist in the vulnerable version so it cannot be the sink",
+    "display_console was omitted to stay within five sinks"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "werkzeug.debug.DebuggedApplication.execute_command": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.0.3",
+      "note": "body differs between 2.3.3 and 3.0.3",
+      "location": "werkzeug.debug:DebuggedApplication.execute_command"
+    },
+    "werkzeug.debug.DebuggedApplication.debug_application": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.0.3",
+      "note": "body differs between 2.3.3 and 3.0.3",
+      "location": "werkzeug.debug:DebuggedApplication.debug_application"
+    },
+    "werkzeug.debug.DebuggedApplication.pin_auth": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.0.3",
+      "note": "body differs between 2.3.3 and 3.0.3",
+      "location": "werkzeug.debug:DebuggedApplication.pin_auth"
+    },
+    "werkzeug.debug.DebuggedApplication.__call__": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.0.3",
+      "note": "body differs between 2.3.3 and 3.0.3",
+      "location": "werkzeug.debug:DebuggedApplication.__call__"
+    }
+  }
+}

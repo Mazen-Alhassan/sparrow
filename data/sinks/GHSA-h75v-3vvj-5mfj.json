@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-h75v-3vvj-5mfj",
+  "package": "jinja2",
+  "sinks": [
+    "jinja2.filters.do_xmlattr"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 0668239 widens the key character check in do_xmlattr from whitespace to the full attribute name character set",
+  "assumptions": [
+    "same function as GHSA-h5c8-rqwp-cp95, which this advisory supersedes"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "jinja2.filters.do_xmlattr": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.1.2",
+      "fixed_version": "3.1.4",
+      "note": "body differs between 3.1.2 and 3.1.4",
+      "location": "jinja2.filters:do_xmlattr"
+    }
+  }
+}

@@ -1,0 +1,407 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-mf9w-mj56-hr94 (CVE-2026-28684, GHSA-mf9w-mj56-hr94, PYSEC-2026-2270)
+Package: python-dotenv 0.19.0
+Fixed in: 1.2.2
+Severity: moderate
+
+Summary: python-dotenv: Symlink following in set_key allows arbitrary file overwrite via cross-device rename fallback
+
+Details:
+### Summary
+
+`set_key()` and `unset_key()` in python-dotenv follow symbolic links when rewriting `.env` files, allowing a local attacker to overwrite arbitrary files via a crafted symlink when a cross-device rename fallback is triggered.
+
+
+### Details
+
+The `rewrite()` context manager in `dotenv/main.py` is used by both `set_key()` and `unset_key()` to safely modify `.env` files. It works by writing to a temporary file (created in the system's default temp directory, typically `/tmp`) and then using `shutil.move()` to replace the original file.
+
+When the `.env` path is a symbolic link and the temp directory resides on a different filesystem than the target (a common configuration on Linux systems using tmpfs for `/tmp`), the following sequence occurs:
+
+1. `shutil.move()` first attempts `os.rename()`, which fails with an `OSError` because atomic renames cannot cross device boundaries.
+2. On failure, `shutil.move()` falls back to `shutil.copy2()` followed by `os.unlink()`.
+3. `shutil.copy2()` calls `shutil.copyfile()` with `follow_symlinks=True` by default.
+4. This causes the content to be written to the **symlink target** rather than replacing the symlink itself.
+
+An attacker who has write access to the directory containing a `.env` file can pre-place a symlink pointing to any file that the application process has write access to. When the application (or a privileged process such as a deploy script, Docker entrypoint, or CI pipeline) calls `set_key()` or `unset_key()`, the symlink target is overwritten with the new `.env` content.
+
+This vulnerability does not require a race condition and is fully deterministic once the preconditions are met.
+
+### Impact
+The primary impacts are to **integrity** and **availability**:
+
+- **File overwrite / destruction (DoS):** An attacker can cause an application or privileged process to corrupt or destroy configuration files, database configs, or other sensitive files it would not normally have access to modify.
+- **Integrity violation:** The target file's original content is replaced with `.env`-formatted content controlled by the attacker.
+- **Potential privilege escalation:** In scenarios where a privileged process (running as root or a service account) calls `set_key()`, the attacker can leverage this to write to files beyond their own access level.
+
+The scope of impact depends on the application using python-dotenv and the privileges under which it runs.
+
+
+### Proof of Concept
+
+The following script demonstrates the vulnerability. It requires `/tmp` and the user's home directory to reside on different devices (common on systemd-based Linux systems with tmpfs).
+
+```python
+import os
+import sys
+import tempfile
+from dotenv import set_key
+
+# Pre-condition: /tmp must be on a different device than the target directory.
+tmp_dev = os.stat("/tmp").st_dev
+home_dev = os.stat(os.path.expanduser("~")).st_dev
+assert tmp_dev != home_dev, "Skipped: /tmp and ~ are on the same device (no cross-device move)"
+
+with tempfile.TemporaryDirectory(dir=os.path.expanduser("~")) as workdir:
+    # File an attacker wants to overwrite
+    target = os.path.join(workdir, "victim_config.txt")
+    with open(target, "w") as f:
+        f.write("DB_PASSWORD=supersecret\n")
+
+    # Attacker pre-places a symlink at the path the application will use as .env
+    env_symlink = os.path.join(workdir, ".env")
+    os.symlink(target, env_symlink)
+
+    before = open(target).read()
+
+    # Application writes a new key -- triggers the cross-device fallback
+    set_key(env_symlink, "INJECTED", "attacker_value")
+
+    after = open(target).read()
+
+    print("Before:", repr(before))
+    print("After: ", repr(after))
+    print("Symlink target overwritten:", target)
+```
+
+**Expected output:**
+```
+Before: 'DB_PASSWORD=supersecret\n'
+After:  "DB_PASSWORD=supersecret\nINJECTED='attacker_value'\n"
+Symlink target overwritten: /home/user/tmp806nut2g/victim_config.txt
+```
+
+### Remediation
+
+The fix changes the `rewrite()` context manager in the following ways:
+
+1. **Symlinks are no longer followed by default.** When the `.env` path is a symlink, `rewrite()` now resolves it to the real path before proceeding, or (by default) operates on the symlink entry itself rather than the target.
+2. **A `follow_symlinks: bool = False` parameter** is added to `set_key()` and `unset_key()` for users who explicitly need the old behavior.
+3. **Temp files are written in the same directory** as the target `.env` file (instead of the system temp directory), eliminating the cross-device rename condition entirely.
+4. **`os.replace()` is used instead of `shutil.move()`**, providing atomic replacement without symlink-following fallback behavior.
+
+Users are advised to upgrade to the patched version as soon as it is available on PyPI.
+
+### Timeline
+
+| Date             | Event                                                                                                                                                                 |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| 2026-01-09  | Initial report received from Giorgos Tsigourakos regarding a separate, unrelated issue also located in `rewrite()` |
+| 2026-01-10   | Co-maintainer acknowledged report, requested clarification                                                         |
+| 2026-01-11    | Initial report assessed as not exploitable and closed                                                              |
+| 2026-02-24  | Reporter identified new, distinct cross-device symlink attack vector with deterministic exploitation               |
+| 2026-02-26  | Co-maintainer confirmed vulnerability and shared draft patch                                                       |
+| 2026-02-26  | Reporter validated fix with monkeypatched PoC, proposed CVSS                                                       |
+| 2026-03-01   | Patch merged to main                                                                          
+
+References:
+- WEB: https://github.com/theskumar/python-dotenv/security/advisories/GHSA-mf9w-mj56-hr94
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-28684
+- WEB: https://github.com/theskumar/python-dotenv/commit/790c5c02991100aa1bf41ee5330aca75edc51311
+- WEB: https://github.com/theskumar/python-dotenv/commit/790c5c02991100aa1bf41ee5330aca75edc51311.patch
+- PACKAGE: https://github.com/theskumar/python-dotenv
+- WEB: https://github.com/theskumar/python-dotenv/releases/tag/v1.2.2
+
+Fix commit, Python hunks only:
+--- https://github.com/theskumar/python-dotenv/commit/790c5c02991100aa1bf41ee5330aca75edc51311.patch ---
+diff --git a/src/dotenv/cli.py b/src/dotenv/cli.py
+index 7a4c7adc..47eec047 100644
+--- a/src/dotenv/cli.py
++++ b/src/dotenv/cli.py
+@@ -114,7 +114,13 @@ def list_values(ctx: click.Context, output_format: str) -> None:
+ @click.argument("key", required=True)
+ @click.argument("value", required=True)
+ def set_value(ctx: click.Context, key: Any, value: Any) -> None:
+-    """Store the given key/value."""
++    """
++    Store the given key/value.
++
++    This doesn't follow symlinks, to avoid accidentally modifying a file at a
++    potentially untrusted path.
++    """
++
+     file = ctx.obj["FILE"]
+     quote = ctx.obj["QUOTE"]
+     export = ctx.obj["EXPORT"]
+@@ -146,7 +152,12 @@ def get(ctx: click.Context, key: Any) -> None:
+ @click.pass_context
+ @click.argument("key", required=True)
+ def unset(ctx: click.Context, key: Any) -> None:
+-    """Removes the given key."""
++    """
++    Removes the given key.
++
++    This doesn't follow symlinks, to avoid accidentally modifying a file at a
++    potentially untrusted path.
++    """
+     file = ctx.obj["FILE"]
+     quote = ctx.obj["QUOTE"]
+     success, key = unset_key(file, key, quote)
+diff --git a/src/dotenv/main.py b/src/dotenv/main.py
+index 1d6bf0b0..48e5245a 100644
+--- a/src/dotenv/main.py
++++ b/src/dotenv/main.py
+@@ -2,7 +2,6 @@
+ import logging
+ import os
+ import pathlib
+-import shutil
+ import stat
+ import sys
+ import tempfile
+@@ -14,9 +13,7 @@
+ from .variables import parse_variables
+ 
+ # A type alias for a string path to be used for the paths in this file.
+-# These paths may flow to `open()` and `shutil.move()`; `shutil.move()`
+-# only accepts string paths, not byte paths or file descriptors. See
+-# https://github.com/python/typeshed/pull/6832.
++# These paths may flow to `open()` and `os.replace()`.
+ StrPath = Union[str, "os.PathLike[str]"]
+ 
+ logger = logging.getLogger(__name__)
+@@ -142,21 +139,54 @@ def get_key(
+ def rewrite(
+     path: StrPath,
+     encoding: Optional[str],
++    follow_symlinks: bool = False,
+ ) -> Iterator[Tuple[IO[str], IO[str]]]:
+-    pathlib.Path(path).touch()
++    if follow_symlinks:
++        path = os.path.realpath(path)
+ 
+-    with tempfile.NamedTemporaryFile(mode="w", encoding=encoding, delete=False) as dest:
++    try:
++        source: IO[str] = open(path, encoding=encoding)
++        try:
++            path_stat = os.lstat(path)
++            original_mode: Optional[int] = (
++                stat.S_IMODE(path_stat.st_mode)
++                if stat.S_ISREG(path_stat.st_mode)
++                else None
++            )
++        except BaseException:
++            source.close()
++            raise
++    except FileNotFoundError:
++        source = io.StringIO("")
++        original_mode = None
++
++    with tempfile.NamedTemporaryFile(
++        mode="w",
++        encoding=encoding,
++        delete=False,
++        prefix=".tmp_",
++        dir=os.path.dirname(os.path.abspath(path)),
++    ) as dest:
++        dest_path = pathlib.Path(dest.name)
+         error = None
++
+         try:
+-            with open(path, encoding=encoding) as source:
++            with source:
+                 yield (source, dest)
+         except BaseException as err:
+             error = err
+ 
+     if error is None:
+-        shutil.move(dest.name, path)
++        try:
++            if original_mode is not None:
++                os.chmod(dest_path, original_mode)
++
++            os.replace(dest_path, path)
++        except BaseException:
++            dest_path.unlink(missing_ok=True)
++            raise
+     else:
+-        os.unlink(dest.name)
++        dest_path.unlink(missing_ok=True)
+         raise error from None
+ 
+ 
+@@ -167,12 +197,16 @@ def set_key(
+     quote_mode: str = "always",
+     export: bool = False,
+     encoding: Optional[str] = "utf-8",
++    follow_symlinks: bool = False,
+ ) -> Tuple[Optional[bool], str, str]:
+     """
+     Adds or Updates a key/value to the given .env
+ 
+-    If the .env path given doesn't exist, fails instead of risking creating
+-    an orphan .env somewhere in the filesystem
++    The target .env file is created if it doesn't exist.
++
++    This function doesn't follow symlinks by default, to avoid accidentally
++    modifying a file at a potentially untrusted path. If you don't need this
++    protection and need symlinks to be followed, use `follow_symlinks`.
+     """
+     if quote_mode not in ("always", "auto", "never"):
+         raise ValueError(f"Unknown quote_mode: {quote_mode}")
+@@ -190,7 +224,10 @@ def set_key(
+     else:
+         line_out = f"{key_to_set}={value_out}\n"
+ 
+-    with rewrite(dotenv_path, encoding=encoding) as (source, dest):
++    with rewrite(dotenv_path, encoding=encoding, follow_symlinks=follow_symlinks) as (
++        source,
++        dest,
++    ):
+         replaced = False
+         missing_newline = False
+         for mapping in with_warn_for_invalid_lines(parse_stream(source)):
+@@ -213,19 +250,27 @@ def unset_key(
+     key_to_unset: str,
+     quote_mode: str = "always",
+     encoding: Optional[str] = "utf-8",
++    follow_symlinks: bool = False,
+ ) -> Tuple[Optional[bool], str]:
+     """
+     Removes a given key from the given `.env` file.
+ 
+     If the .env path given doesn't exist, fails.
+     If the given key doesn't exist in the .env, fails.
++
++    This function doesn't follow symlinks by default, to avoid accidentally
++    modifying a file at a potentially untrusted path. If you don't need this
++    protection and need symlinks to be followed, use `follow_symlinks`.
+     """
+     if not os.path.exists(dotenv_path):
+         logger.warning("Can't delete from %s - it doesn't exist.", dotenv_path)
+         return None, key_to_unset
+ 
+     removed = False
+-    with rewrite(dotenv_path, encoding=encoding) as (source, dest):
++    with rewrite(dotenv_path, encoding=encoding, follow_symlinks=follow_symlinks) as (
++        source,
++        dest,
++    ):
+         for mapping in with_warn_for_invalid_lines(parse_stream(source)):
+             if mapping.key == key_to_unset:
+                 removed = True
+diff --git a/tests/test_main.py b/tests/test_main.py
+index 616c3b0c..50703af0 100644
+--- a/tests/test_main.py
++++ b/tests/test_main.py
+@@ -62,6 +62,86 @@ def test_set_key_encoding(dotenv_path):
+     assert dotenv_path.read_text(encoding=encoding) == "a='é'\n"
+ 
+ 
++@pytest.mark.skipif(
++    sys.platform == "win32", reason="file mode bits behave differently on Windows"
++)
++def test_set_key_preserves_file_mode(dotenv_path):
++    dotenv_path.write_text("a=x\n")
++    dotenv_path.chmod(0o640)
++    mode_before = stat.S_IMODE(dotenv_path.stat().st_mode)
++
++    dotenv.set_key(dotenv_path, "a", "y")
++
++    mode_after = stat.S_IMODE(dotenv_path.stat().st_mode)
++    assert mode_before == mode_after
++
++
++def test_rewrite_closes_file_handle_on_lstat_failure(tmp_path):
++    dotenv_path = tmp_path / ".env"
++    dotenv_path.write_text("a=x\n")
++    real_open = open
++    opened_handles = []
++
++    def tracking_open(*args, **kwargs):
++        handle = real_open(*args, **kwargs)
++        opened_handles.append(handle)
++        return handle
++
++    with mock.patch("dotenv.main.os.lstat", side_effect=FileNotFoundError):
++        with mock.patch("dotenv.main.open", side_effect=tracking_open):
++            dotenv.set_key(dotenv_path, "a", "x")
++
++    assert opened_handles, "expected at least one file to be opened"
++    assert all(handle.closed for handle in opened_handles)
++
++
++@pytest.mark.skipif(
++    sys.platform == "win32", reason="symlinks require elevated privileges on Windows"
++)
++def test_set_key_symlink_to_existing_file(tmp_path):
++    target = tmp_path / "target.env"
++    target.write_text("a=x\n")
++    symlink = tmp_path / ".env"
++    symlink.symlink_to(target)
++
++    dotenv.set_key(symlink, "a", "y")
++
++    assert target.read_text() == "a=x\n"
++    assert not symlink.is_symlink()
++    assert "a='y'" in symlink.read_text()
++    assert stat.S_IMODE(symlink.stat().st_mode) == 0o600
++
++
++@pytest.mark.skipif(
++    sys.platform == "win32", reason="symlinks require elevated privileges on Windows"
++)
++def test_set_key_symlink_to_missing_file(tmp_path):
++    target = tmp_path / "nx"
++    symlink = tmp_path / ".env"
++    symlink.symlink_to(target)
++
++    dotenv.set_key(symlink, "a", "x")
++
++    assert not target.exists()
++    assert not symlink.is_symlink()
++    assert symlink.read_text() == "a='x'\n"
++
++
++@pytest.mark.skipif(
++    sys.platform == "win32", reason="symlinks require elevated privileges on Windows"
++)
++def test_set_key_follow_symlinks(tmp_path):
++    target = tmp_path / "target.env"
++    target.write_text("a=x\n")
++    symlink = tmp_path / ".env"
++    symlink.symlink_to(target)
++
++    dotenv.set_key(symlink, "a", "y", follow_symlinks=True)
++
++    assert target.read_text() == "a='y'\n"
++    assert symlink.is_symlink()
++
++
+ @pytest.mark.skipif(
+     sys.platform != "win32" and os.geteuid() == 0,
+     reason="Root user can access files even with 000 permissions.",
+@@ -195,6 +275,54 @@ def test_unset_non_existent_file(tmp_path):
+     )
+ 
+ 
++@pytest.mark.skipif(
++    sys.platform == "win32", reason="symlinks require elevated privileges on Windows"
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-mf9w-mj56-hr94", "package": "python-dotenv", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-34jh-p97f-mpxf",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.util.retry.Retry"
+  ],
+  "confidence": "medium",
+  "evidence": "fix commit 40b6d16 adds Proxy-Authorization to Retry.DEFAULT_REMOVE_HEADERS_ON_REDIRECT, a class attribute, so no function body changed",
+  "assumptions": [
+    "the sink is a class attribute, not a function, so the class node is named instead",
+    "the code that acts on the value is HTTPConnectionPool.urlopen, which the fix did not touch"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "urllib3.util.retry.Retry": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.26.6",
+      "fixed_version": "1.26.19",
+      "note": "body differs between 1.26.6 and 1.26.19",
+      "location": "urllib3.util.retry:Retry"
+    }
+  }
+}

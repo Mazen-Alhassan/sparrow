@@ -1,0 +1,12 @@
+{
+  "advisory": "PYSEC-2024-161",
+  "package": "pyarrow",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the advisory states the flaw affects the Apache Arrow R package only, not pyarrow",
+  "assumptions": [
+    "assumes this row is a false positive for the PyPI ecosystem; OSV still lists pyarrow 14.0.1 as affected"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

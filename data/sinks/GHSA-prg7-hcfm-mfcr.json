@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-prg7-hcfm-mfcr",
+  "package": "sqlparse",
+  "sinks": [
+    "sqlparse.keywords.SQL_REGEX"
+  ],
+  "confidence": "medium",
+  "evidence": "the advisory names sqlparse/keywords.py line 33, where SQL_REGEX holds the dollar quote pattern with a backreference",
+  "assumptions": [
+    "SQL_REGEX is a module level list, not a function, so it cannot be named as a function sink and this identifier will fail verification",
+    "the function that executes it is sqlparse.lexer.Lexer.get_tokens, which the fix may not have changed"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "sqlparse.keywords.SQL_REGEX": {
+      "status": "absent_in_vulnerable",
+      "present_in_vulnerable": false,
+      "changed_in_fixed": false,
+      "vulnerable_version": "0.4.4",
+      "fixed_version": "0.6.0",
+      "note": "sqlparse.keywords.SQL_REGEX does not exist in sqlparse 0.4.4"
+    }
+  }
+}

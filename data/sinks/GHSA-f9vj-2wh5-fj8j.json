@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-f9vj-2wh5-fj8j",
+  "package": "werkzeug",
+  "sinks": [
+    "werkzeug.security.safe_join"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 2767bcb adds a leading slash check inside safe_join in src/werkzeug/security.py",
+  "assumptions": [
+    "assumes the flaw is in safe_join rather than in send_from_directory, its caller"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "werkzeug.security.safe_join": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.0.6",
+      "note": "body differs between 2.3.3 and 3.0.6",
+      "location": "werkzeug.security:safe_join"
+    }
+  }
+}

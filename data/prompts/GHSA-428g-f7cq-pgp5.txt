@@ -1,0 +1,189 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-428g-f7cq-pgp5 (CVE-2025-68480, GHSA-428g-f7cq-pgp5, PYSEC-2026-1605)
+Package: marshmallow 3.19.0
+Fixed in: 3.26.2, 4.1.2
+Severity: moderate
+
+Summary: Marshmallow has DoS in Schema.load(many)
+
+Details:
+### Impact
+
+`Schema.load(data, many=True)` is vulnerable to denial of service attacks. A moderately sized request can consume a disproportionate amount of CPU time.
+
+### Patches
+
+4.1.2, 3.26.2
+
+### Workarounds
+
+```py
+# Fail fast
+def load_many(schema, data, **kwargs):
+    if not isinstance(data, list):
+        raise ValidationError(['Invalid input type.'])
+    return [schema.load(item, **kwargs) for item in data]
+```
+
+References:
+- WEB: https://github.com/marshmallow-code/marshmallow/security/advisories/GHSA-428g-f7cq-pgp5
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-68480
+- WEB: https://github.com/marshmallow-code/marshmallow/commit/d24a0c9df061c4daa92f71cf85aca25b83eee508
+- PACKAGE: https://github.com/marshmallow-code/marshmallow
+
+Fix commit, Python hunks only:
+--- https://github.com/marshmallow-code/marshmallow/commit/d24a0c9df061c4daa92f71cf85aca25b83eee508.patch ---
+diff --git a/src/marshmallow/error_store.py b/src/marshmallow/error_store.py
+index 61320ab23..da7c69f67 100644
+--- a/src/marshmallow/error_store.py
++++ b/src/marshmallow/error_store.py
+@@ -6,6 +6,8 @@
+     Users should not need to use this module directly.
+ """
+ 
++from copy import deepcopy
++
+ from marshmallow.exceptions import SCHEMA
+ 
+ 
+@@ -18,6 +20,7 @@ def store_error(self, messages, field_name=SCHEMA, index=None):
+         # field error  -> store/merge error messages under field name key
+         # schema error -> if string or list, store/merge under _schema key
+         #              -> if dict, store/merge with other top-level keys
++        messages = deepcopy(messages)
+         if field_name != SCHEMA or not isinstance(messages, dict):
+             messages = {field_name: messages}
+         if index is not None:
+@@ -37,24 +40,26 @@ def merge_errors(errors1, errors2):  # noqa: PLR0911
+         return errors1
+     if isinstance(errors1, list):
+         if isinstance(errors2, list):
+-            return errors1 + errors2
++            errors1.extend(errors2)
++            return errors1
+         if isinstance(errors2, dict):
+-            return dict(errors2, **{SCHEMA: merge_errors(errors1, errors2.get(SCHEMA))})
+-        return [*errors1, errors2]
++            errors2[SCHEMA] = merge_errors(errors1, errors2.get(SCHEMA))
++            return errors2
++        errors1.append(errors2)
++        return errors1
+     if isinstance(errors1, dict):
+-        if isinstance(errors2, list):
+-            return dict(errors1, **{SCHEMA: merge_errors(errors1.get(SCHEMA), errors2)})
+         if isinstance(errors2, dict):
+-            errors = dict(errors1)
+             for key, val in errors2.items():
+-                if key in errors:
+-                    errors[key] = merge_errors(errors[key], val)
++                if key in errors1:
++                    errors1[key] = merge_errors(errors1[key], val)
+                 else:
+-                    errors[key] = val
+-            return errors
+-        return dict(errors1, **{SCHEMA: merge_errors(errors1.get(SCHEMA), errors2)})
++                    errors1[key] = val
++            return errors1
++        errors1[SCHEMA] = merge_errors(errors1.get(SCHEMA), errors2)
++        return errors1
+     if isinstance(errors2, list):
+         return [errors1, *errors2]
+     if isinstance(errors2, dict):
+-        return dict(errors2, **{SCHEMA: merge_errors(errors1, errors2.get(SCHEMA))})
++        errors2[SCHEMA] = merge_errors(errors1, errors2.get(SCHEMA))
++        return errors2
+     return [errors1, errors2]
+---
+ tests/test_error_store.py | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+diff --git a/tests/test_error_store.py b/tests/test_error_store.py
+index ba799a107..022266af4 100644
+--- a/tests/test_error_store.py
++++ b/tests/test_error_store.py
+@@ -1,7 +1,7 @@
+ from typing import NamedTuple
+ 
+ from marshmallow import missing
+-from marshmallow.error_store import merge_errors
++from marshmallow.error_store import merge_errors, ErrorStore
+ 
+ 
+ def test_missing_is_falsy():
+@@ -149,3 +149,19 @@ def test_deep_merging_dicts(self):
+         assert merge_errors(
+             {"field1": {"field2": "error1"}}, {"field1": {"field2": "error2"}}
+         ) == {"field1": {"field2": ["error1", "error2"]}}
++
++    def test_list_not_changed(self):
++        store = ErrorStore()
++        message = ["foo"]
++        store.store_error(message)
++        store.store_error(message)
++        assert message == ["foo"]
++        assert store.errors == {"_schema": ["foo", "foo"]}
++
++    def test_dict_not_changed(self):
++        store = ErrorStore()
++        message = {"foo": ["bar"]}
++        store.store_error(message)
++        store.store_error(message)
++        assert message == {"foo": ["bar"]}
++        assert store.errors == {"foo": ["bar", "bar"]}
+---
+ src/marshmallow/error_store.py | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+diff --git a/src/marshmallow/error_store.py b/src/marshmallow/error_store.py
+index da7c69f67..c4f0010a9 100644
+--- a/src/marshmallow/error_store.py
++++ b/src/marshmallow/error_store.py
+@@ -6,8 +6,6 @@
+     Users should not need to use this module directly.
+ """
+ 
+-from copy import deepcopy
+-
+ from marshmallow.exceptions import SCHEMA
+ 
+ 
+@@ -20,13 +18,19 @@ def store_error(self, messages, field_name=SCHEMA, index=None):
+         # field error  -> store/merge error messages under field name key
+         # schema error -> if string or list, store/merge under _schema key
+         #              -> if dict, store/merge with other top-level keys
+-        messages = deepcopy(messages)
++        messages = copy_containers(messages)
+         if field_name != SCHEMA or not isinstance(messages, dict):
+             messages = {field_name: messages}
+         if index is not None:
+             messages = {index: messages}
+         self.errors = merge_errors(self.errors, messages)
+ 
++def copy_containers(errors):
++    if isinstance(errors, list):
++        return [copy_containers(val) for val in errors]
++    if isinstance(errors, dict):
++        return {key: copy_containers(val) for key, val in errors.items()}
++    return errors
+ 
+ def merge_errors(errors1, errors2):  # noqa: PLR0911
+     """Deeply merge two error messages.
+---
+ CHANGELOG.rst  | 8 ++++++++
+ pyproject.toml | 2 +-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-428g-f7cq-pgp5", "package": "marshmallow", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

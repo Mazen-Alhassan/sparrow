@@ -1,0 +1,34 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory PYSEC-2022-43167 (CVE-2022-28108, GHSA-h2rr-m97p-6jq9)
+Package: selenium 3.141.0
+Fixed in: 4.0.0
+Severity: unknown
+
+Summary: (none)
+
+Details:
+Selenium Server (Grid) before 4 allows CSRF because it permits non-JSON content types such as application/x-www-form-urlencoded, multipart/form-data, and text/plain.
+
+References:
+- WEB: https://www.gabriel.urdhr.fr/2022/02/07/selenium-standalone-server-csrf-dns-rebinding-rce/
+- ADVISORY: https://www.selenium.dev/downloads/
+- WEB: https://www.openwall.com/lists/oss-security/2022/02/07/3
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "PYSEC-2022-43167", "package": "selenium", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

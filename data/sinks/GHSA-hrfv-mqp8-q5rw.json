@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-hrfv-mqp8-q5rw",
+  "package": "werkzeug",
+  "sinks": [
+    "werkzeug.sansio.multipart.MultipartDecoder._parse_data"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit b1916c0 changes the partial boundary search inside _parse_data in src/werkzeug/sansio/multipart.py",
+  "assumptions": [
+    "assumes the enclosing class is MultipartDecoder, which the hunk header does not name",
+    "werkzeug.formparser.MultiPartParser.parse is the caller and was also touched by a later commit in the same series"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "werkzeug.sansio.multipart.MultipartDecoder._parse_data": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "2.3.8",
+      "note": "body differs between 2.3.3 and 2.3.8",
+      "location": "werkzeug.sansio.multipart:MultipartDecoder._parse_data"
+    }
+  }
+}

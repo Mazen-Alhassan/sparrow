@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-765j-9r45-w2q2",
+  "package": "flask-appbuilder",
+  "sinks": [
+    "flask_appbuilder.security.manager.BaseSecurityManager.register_views"
+  ],
+  "confidence": "high",
+  "evidence": "pull request 2384 moves the resetpasswordview and resetmypasswordview registration inside the AUTH_DB branch of register_views in flask_appbuilder/security/manager.py",
+  "assumptions": [
+    "assumes the class in manager.py is BaseSecurityManager in 4.3.10",
+    "the vulnerable behaviour is a route registration, so reachability of register_views is a weaker signal than reachability of the reset view itself"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "flask_appbuilder.security.manager.BaseSecurityManager.register_views": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "4.3.10",
+      "fixed_version": "4.8.1",
+      "note": "body differs between 4.3.10 and 4.8.1",
+      "location": "flask_appbuilder.security.manager:BaseSecurityManager.register_views"
+    }
+  }
+}

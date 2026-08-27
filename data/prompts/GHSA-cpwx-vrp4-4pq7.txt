@@ -1,0 +1,119 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-cpwx-vrp4-4pq7 (CVE-2025-27516, GHSA-cpwx-vrp4-4pq7, PYSEC-2026-1471)
+Package: jinja2 3.1.2
+Fixed in: 3.1.6
+Severity: moderate
+
+Summary: Jinja2 vulnerable to sandbox breakout through attr filter selecting format method
+
+Details:
+An oversight in how the Jinja sandboxed environment interacts with the `|attr` filter allows an attacker that controls the content of a template to execute arbitrary Python code.
+
+To exploit the vulnerability, an attacker needs to control the content of a template. Whether that is the case depends on the type of application using Jinja. This vulnerability impacts users of applications which execute untrusted templates.
+
+Jinja's sandbox does catch calls to `str.format` and ensures they don't escape the sandbox. However, it's possible to use the `|attr` filter to get a reference to a string's plain format method, bypassing the sandbox. After the fix, the `|attr` filter no longer bypasses the environment's attribute lookup.
+
+References:
+- WEB: https://github.com/pallets/jinja/security/advisories/GHSA-cpwx-vrp4-4pq7
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-27516
+- WEB: https://github.com/pallets/jinja/commit/90457bbf33b8662926ae65cdde4c4c32e756e403
+- PACKAGE: https://github.com/pallets/jinja
+- WEB: https://lists.debian.org/debian-lts-announce/2025/04/msg00022.html
+- WEB: https://lists.debian.org/debian-lts-announce/2025/04/msg00045.html
+
+Fix commit, Python hunks only:
+--- https://github.com/pallets/jinja/commit/90457bbf33b8662926ae65cdde4c4c32e756e403.patch ---
+diff --git a/src/jinja2/filters.py b/src/jinja2/filters.py
+index e5b5a00c5..2bcba4fbd 100644
+--- a/src/jinja2/filters.py
++++ b/src/jinja2/filters.py
+@@ -6,6 +6,7 @@
+ import typing
+ import typing as t
+ from collections import abc
++from inspect import getattr_static
+ from itertools import chain
+ from itertools import groupby
+ 
+@@ -1411,31 +1412,25 @@ def do_reverse(value: t.Union[str, t.Iterable[V]]) -> t.Union[str, t.Iterable[V]
+ def do_attr(
+     environment: "Environment", obj: t.Any, name: str
+ ) -> t.Union[Undefined, t.Any]:
+-    """Get an attribute of an object.  ``foo|attr("bar")`` works like
+-    ``foo.bar`` just that always an attribute is returned and items are not
+-    looked up.
++    """Get an attribute of an object. ``foo|attr("bar")`` works like
++    ``foo.bar``, but returns undefined instead of falling back to ``foo["bar"]``
++    if the attribute doesn't exist.
+ 
+     See :ref:`Notes on subscriptions <notes-on-subscriptions>` for more details.
+     """
++    # Environment.getattr will fall back to obj[name] if obj.name doesn't exist.
++    # But we want to call env.getattr to get behavior such as sandboxing.
++    # Determine if the attr exists first, so we know the fallback won't trigger.
+     try:
+-        name = str(name)
+-    except UnicodeError:
+-        pass
+-    else:
+-        try:
+-            value = getattr(obj, name)
+-        except AttributeError:
+-            pass
+-        else:
+-            if environment.sandboxed:
+-                environment = t.cast("SandboxedEnvironment", environment)
+-
+-                if not environment.is_safe_attribute(obj, name, value):
+-                    return environment.unsafe_undefined(obj, name)
+-
+-            return value
+-
+-    return environment.undefined(obj=obj, name=name)
++        # This avoids executing properties/descriptors, but misses __getattr__
++        # and __getattribute__ dynamic attrs.
++        getattr_static(obj, name)
++    except AttributeError:
++        # This finds dynamic attrs, and we know it's not a descriptor at this point.
++        if not hasattr(obj, name):
++            return environment.undefined(obj=obj, name=name)
++
++    return environment.getattr(obj, name)
+ 
+ 
+ @typing.overload
+diff --git a/tests/test_security.py b/tests/test_security.py
+index 864d5f7f9..3a1378192 100644
+--- a/tests/test_security.py
++++ b/tests/test_security.py
+@@ -190,3 +190,13 @@ def run(value, arg):
+ 
+         with pytest.raises(SecurityError):
+             t.render()
++
++    def test_attr_filter(self) -> None:
++        env = SandboxedEnvironment()
++        t = env.from_string(
++            """{{ "{0.__call__.__builtins__[__import__]}"
++                  | attr("format")(not_here) }}"""
++        )
++
++        with pytest.raises(SecurityError):
++            t.render()
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-cpwx-vrp4-4pq7", "package": "jinja2", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

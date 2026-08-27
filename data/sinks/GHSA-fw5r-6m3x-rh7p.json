@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-fw5r-6m3x-rh7p",
+  "package": "flask-appbuilder",
+  "sinks": [
+    "flask_appbuilder.security.views.AuthDBView.login"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 3030e88 adds a new no_cache decorator and applies it to AuthDBView.login in flask_appbuilder/security/views.py",
+  "assumptions": [
+    "the no_cache decorator is new in the fix so it cannot be the sink in the vulnerable version",
+    "the same decorator is applied to other auth views in the full commit and only login was named"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "flask_appbuilder.security.views.AuthDBView.login": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "4.3.10",
+      "fixed_version": "4.5.1",
+      "note": "body differs between 4.3.10 and 4.5.1",
+      "location": "flask_appbuilder.security.views:AuthDBView.login"
+    }
+  }
+}

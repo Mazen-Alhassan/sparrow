@@ -1,0 +1,138 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-r6ph-v2qm-q3c2 (CVE-2026-26007, GHSA-r6ph-v2qm-q3c2, PYSEC-2026-2141)
+Package: cryptography 41.0.2
+Fixed in: 46.0.5
+Severity: high
+
+Summary: cryptography Vulnerable to a Subgroup Attack Due to Missing Subgroup Validation for SECT Curves
+
+Details:
+## Vulnerability Summary
+
+The `public_key_from_numbers` (or `EllipticCurvePublicNumbers.public_key()`), `EllipticCurvePublicNumbers.public_key()`, `load_der_public_key()` and `load_pem_public_key()` functions do not verify that the point belongs to the expected prime-order subgroup of the curve.
+
+This missing validation allows an attacker to provide a public key point `P` from a small-order subgroup.  This can lead to security issues in various situations, such as the most commonly used signature verification (ECDSA) and shared key negotiation (ECDH). When the victim computes the shared secret as `S = [victim_private_key]P` via ECDH,  this leaks information about `victim_private_key mod (small_subgroup_order)`. For curves with cofactor > 1, this reveals the least significant bits of the private key.  When these weak public keys are used in ECDSA , it's easy to forge signatures on the small subgroup.
+
+Only SECT curves are impacted by this.
+
+## Credit
+
+This vulnerability was discovered by:
+- XlabAI Team of Tencent Xuanwu Lab
+- Atuin Automated Vulnerability Discovery Engine
+
+References:
+- WEB: https://github.com/pyca/cryptography/security/advisories/GHSA-r6ph-v2qm-q3c2
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-26007
+- WEB: https://github.com/pyca/cryptography/commit/0eebb9dbb6343d9bc1d91e5a2482ed4e054a6d8c
+- PACKAGE: https://github.com/pyca/cryptography
+- WEB: https://github.com/pyca/cryptography/releases/tag/46.0.5
+- WEB: http://www.openwall.com/lists/oss-security/2026/02/10/4
+
+Fix commit, Python hunks only:
+--- https://github.com/pyca/cryptography/commit/0eebb9dbb6343d9bc1d91e5a2482ed4e054a6d8c.patch ---
+diff --git a/src/cryptography/hazmat/primitives/asymmetric/ec.py b/src/cryptography/hazmat/primitives/asymmetric/ec.py
+index a13d9827f44a..8638d2064c52 100644
+--- a/src/cryptography/hazmat/primitives/asymmetric/ec.py
++++ b/src/cryptography/hazmat/primitives/asymmetric/ec.py
+@@ -445,3 +445,26 @@ def get_curve_for_oid(oid: ObjectIdentifier) -> type[EllipticCurve]:
+             "The provided object identifier has no matching elliptic "
+             "curve class"
+         )
++
++
++_SECT_CURVES: tuple[type[EllipticCurve], ...] = (
++    SECT163K1,
++    SECT163R2,
++    SECT233K1,
++    SECT233R1,
++    SECT283K1,
++    SECT283R1,
++    SECT409K1,
++    SECT409R1,
++    SECT571K1,
++    SECT571R1,
++)
++
++for _curve_cls in _SECT_CURVES:
++    utils.deprecated(
++        _curve_cls,
++        __name__,
++        f"{_curve_cls.__name__} will be removed in the next release.",
++        utils.DeprecatedIn46,
++        name=_curve_cls.__name__,
++    )
+diff --git a/src/cryptography/utils.py b/src/cryptography/utils.py
+index a0fc3b1da231..3a930fdeae5a 100644
+--- a/src/cryptography/utils.py
++++ b/src/cryptography/utils.py
+@@ -26,6 +26,7 @@ class CryptographyDeprecationWarning(UserWarning):
+ DeprecatedIn41 = CryptographyDeprecationWarning
+ DeprecatedIn42 = CryptographyDeprecationWarning
+ DeprecatedIn43 = CryptographyDeprecationWarning
++DeprecatedIn46 = CryptographyDeprecationWarning
+ 
+ 
+ # If you're wondering why we don't use `Buffer`, it's because `Buffer` would
+diff --git a/tests/hazmat/primitives/test_ec.py b/tests/hazmat/primitives/test_ec.py
+index 2f62e46db5fb..a39a69e5084e 100644
+--- a/tests/hazmat/primitives/test_ec.py
++++ b/tests/hazmat/primitives/test_ec.py
+@@ -1542,3 +1542,40 @@ def test_exchange_non_matching_curve(self, backend):
+ 
+         with pytest.raises(ValueError):
+             key.exchange(ec.ECDH(), public_key)
++
++
++def test_invalid_sect_public_keys(backend):
++    _skip_curve_unsupported(backend, ec.SECT571K1())
++    public_numbers = ec.EllipticCurvePublicNumbers(1, 1, ec.SECT571K1())
++    with pytest.raises(ValueError):
++        public_numbers.public_key()
++
++    point = binascii.unhexlify(
++        b"0400000000000000000000000000000000000000000000000000000000000000000"
++        b"0000000000000000000000000000000000000000000000000000000000000000000"
++        b"0000000000010000000000000000000000000000000000000000000000000000000"
++        b"0000000000000000000000000000000000000000000000000000000000000000000"
++        b"0000000000000000000001"
++    )
++    with pytest.raises(ValueError):
++        ec.EllipticCurvePublicKey.from_encoded_point(ec.SECT571K1(), point)
++
++    der = binascii.unhexlify(
++        b"3081a7301006072a8648ce3d020106052b810400260381920004000000000000000"
++        b"0000000000000000000000000000000000000000000000000000000000000000000"
++        b"0000000000000000000000000000000000000000000000000000000000000100000"
++        b"0000000000000000000000000000000000000000000000000000000000000000000"
++        b"0000000000000000000000000000000000000000000000000000000000000000000"
++        b"00001"
++    )
++    with pytest.raises(ValueError):
++        serialization.load_der_public_key(der)
++
++    pem = textwrap.dedent("""-----BEGIN PUBLIC KEY-----
++    MIGnMBAGByqGSM49AgEGBSuBBAAmA4GSAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
++    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
++    AAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
++    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=
++    -----END PUBLIC KEY-----""").encode()
++    with pytest.raises(ValueError):
++        serialization.load_pem_public_key(pem)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-r6ph-v2qm-q3c2", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

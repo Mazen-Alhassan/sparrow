@@ -1,0 +1,231 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-j2pw-vp55-fqqj (CVE-2024-25128, GHSA-j2pw-vp55-fqqj, PYSEC-2026-340)
+Package: flask-appbuilder 4.3.10
+Fixed in: 4.3.11
+Severity: critical
+
+Summary: Flask-AppBuilder vulnerable to incorrect authentication when using auth type OpenID 
+
+Details:
+### Impact
+When Flask-AppBuilder is set to AUTH_TYPE AUTH_OID, allows an attacker to forge an HTTP request, that could deceive the backend into using any requested OpenID service. This vulnerability could grant an attacker unauthorised privilege access if a custom OpenID service is deployed by the attacker and accessible by the backend. 
+
+This vulnerability is only exploitable when the application is using the old (deprecated 10 years ago) OpenID 2.0 authorization protocol (which is very different from the popular OIDC - Open ID Connect - popular protocol used today). Currently, this protocol is regarded as legacy, with significantly reduced usage and not supported for several years by major authorization providers.
+
+### Patches
+Upgrade to Flask-AppBuilder 4.3.11
+
+### Workarounds
+If upgrade is not possible add the following to your config:
+
+```
+from flask import flash, redirect
+from flask_appbuilder import expose
+from flask_appbuilder.security.sqla.manager import SecurityManager
+from flask_appbuilder.security.views import AuthOIDView
+from flask_appbuilder.security.forms import LoginForm_oid
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+
+class FixedOIDView(AuthOIDView):
+    @expose("/login/", methods=["GET", "POST"])
+    def login(self, flag=True):
+        form = LoginForm_oid()
+        if form.validate_on_submit():
+            identity_url = None
+            for provider in self.appbuilder.sm.openid_providers:
+                if provider.get("url") == form.openid.data:
+                    identity_url = form.openid.data
+            if identity_url is None:
+                flash(self.invalid_login_message, "warning")
+                return redirect(self.appbuilder.get_url_for_login)
+        return super().login(flag=flag)
+
+class FixedSecurityManager(SecurityManager):
+    authoidview = FixedOIDView
+
+
+FAB_SECURITY_MANAGER_CLASS = "config.FixedSecurityManager"
+```
+
+References:
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/security/advisories/GHSA-j2pw-vp55-fqqj
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-25128
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/commit/6336456d83f8f111c842b2b53d1e89627f2502c8
+- PACKAGE: https://github.com/dpgaspar/Flask-AppBuilder
+
+Fix commit, Python hunks only:
+--- https://github.com/dpgaspar/Flask-AppBuilder/commit/6336456d83f8f111c842b2b53d1e89627f2502c8.patch ---
+diff --git a/flask_appbuilder/security/manager.py b/flask_appbuilder/security/manager.py
+index 80a91b8cf4..8f86b7ee51 100644
+--- a/flask_appbuilder/security/manager.py
++++ b/flask_appbuilder/security/manager.py
+@@ -1447,6 +1447,14 @@ def _has_view_access(
+         # If it's not a builtin role check against database store roles
+         return self.exist_permission_on_roles(view_name, permission_name, db_role_ids)
+ 
++    def get_oid_identity_url(self, provider_name: str) -> Optional[str]:
++        """
++        Returns the OIDC identity provider URL
++        """
++        for provider in self.openid_providers:
++            if provider.get("name") == provider_name:
++                return provider.get("url")
++
+     def get_user_roles(self, user) -> List[object]:
+         """
+         Get current user roles, if user is not authenticated returns the public role
+diff --git a/flask_appbuilder/security/views.py b/flask_appbuilder/security/views.py
+index fd4db67417..c38e23f395 100644
+--- a/flask_appbuilder/security/views.py
++++ b/flask_appbuilder/security/views.py
+@@ -565,8 +565,12 @@ def login_handler(self):
+             form = LoginForm_oid()
+             if form.validate_on_submit():
+                 session["remember_me"] = form.remember_me.data
++                identity_url = self.appbuilder.sm.get_oid_identity_url(form.openid.data)
++                if identity_url is None:
++                    flash(as_unicode(self.invalid_login_message), "warning")
++                    return redirect(self.appbuilder.get_url_for_login)
+                 return self.appbuilder.sm.oid.try_login(
+-                    form.openid.data,
++                    identity_url,
+                     ask_for=self.oid_ask_for,
+                     ask_for_optional=self.oid_ask_for_optional,
+                 )
+diff --git a/tests/config_oid.py b/tests/config_oid.py
+index 0000000000..140e863f7b
+--- /dev/null
++++ b/tests/config_oid.py
+@@ -0,0 +1,29 @@
++import os
++
++from flask_appbuilder.security.manager import AUTH_OID
++
++basedir = os.path.abspath(os.path.dirname(__file__))
++
++SQLALCHEMY_DATABASE_URI = os.environ.get(
++    "SQLALCHEMY_DATABASE_URI"
++) or "sqlite:///" + os.path.join(basedir, "app.db")
++
++SECRET_KEY = "thisismyscretkey"
++
++AUTH_TYPE = AUTH_OID
++
++OPENID_PROVIDERS = [
++    {"name": "Google", "url": "https://www.google.com/accounts/o8/id"},
++    {"name": "Yahoo", "url": "https://me.yahoo.com"},
++    {"name": "AOL", "url": "http://openid.aol.com/<username>"},
++    {"name": "Flickr", "url": "http://www.flickr.com/<username>"},
++    {"name": "OpenStack", "url": "https://openstackid.org/"},
++]
++
++WTF_CSRF_ENABLED = False
++
++# Will allow user self registration
++AUTH_USER_REGISTRATION = True
++
++# The default user self registration role for all users
++AUTH_USER_REGISTRATION_ROLE = "Admin"
+diff --git a/tests/test_mvc_oauth.py b/tests/test_mvc_oauth.py
+index b51d64717b..6e9a5227b6 100644
+--- a/tests/test_mvc_oauth.py
++++ b/tests/test_mvc_oauth.py
+@@ -26,7 +26,7 @@ def get(self, item):
+             return UserInfoReponseMock()
+ 
+ 
+-class APICSRFTestCase(FABTestCase):
++class MVCOAuthTestCase(FABTestCase):
+     def setUp(self):
+         from flask import Flask
+         from flask_wtf import CSRFProtect
+diff --git a/tests/test_mvc_oid.py b/tests/test_mvc_oid.py
+index 0000000000..2965f4369e
+--- /dev/null
++++ b/tests/test_mvc_oid.py
+@@ -0,0 +1,53 @@
++from unittest.mock import MagicMock
++
++from flask_appbuilder import SQLA
++from tests.base import FABTestCase
++
++
++class MVCOIDTestCase(FABTestCase):
++    def setUp(self):
++        from flask import Flask
++        from flask_appbuilder import AppBuilder
++
++        self.app = Flask(__name__)
++        self.app.config.from_object("tests.config_oid")
++        self.db = SQLA(self.app)
++        self.appbuilder = AppBuilder(self.app, self.db.session)
++
++    def test_oid_login_get(self):
++        """
++        OID: Test login get
++        """
++        self.appbuilder.sm.oid.try_login = MagicMock(return_value="Login ok")
++
++        with self.app.test_client() as client:
++            response = client.get("/login/")
++        self.assertEqual(response.status_code, 200)
++        for provider in self.app.config["OPENID_PROVIDERS"]:
++            self.assertIn(provider["name"], response.data.decode("utf-8"))
++
++    def test_oid_login_post(self):
++        """
++        OID: Test login post with a valid provider
++        """
++        self.appbuilder.sm.oid.try_login = MagicMock(return_value="Login ok")
++
++        with self.app.test_client() as client:
++            response = client.post("/login/", data=dict(openid="OpenStack"))
++            self.assertEqual(response.status_code, 200)
++            self.assertEqual(response.data, b"Login ok")
++        self.appbuilder.sm.oid.try_login.assert_called_with(
++            "https://openstackid.org/", ask_for=["email"], ask_for_optional=[]
++        )
++
++    def test_oid_login_post_invalid_provider(self):
++        """
++        OID: Test login post with an invalid provider
++        """
++        self.appbuilder.sm.oid.try_login = MagicMock(return_value="Not Ok")
++
++        with self.app.test_client() as client:
++            response = client.post("/login/", data=dict(openid="DoesNotExist"))
++            self.assertEqual(response.status_code, 302)
++            self.assertEqual(response.location, "/login/")
++        self.appbuilder.sm.oid.try_login.assert_not_called()
+diff --git a/tests/test_security_api.py b/tests/test_security_api.py
+index b0e4b419e6..18606e9f60 100644
+--- a/tests/test_security_api.py
++++ b/tests/test_security_api.py
+@@ -444,6 +444,8 @@ def setUp(self):
+             if hasattr(b, "datamodel") and b.datamodel.session is not None:
+                 b.datamodel.session = self.db.session
+ 
++        self.create_default_users(self.appbuilder)
++
+     def tearDown(self):
+         self.appbuilder.session.close()
+         engine = self.appbuilder.session.get_bind(mapper=None, clause=None)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-j2pw-vp55-fqqj", "package": "flask-appbuilder", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

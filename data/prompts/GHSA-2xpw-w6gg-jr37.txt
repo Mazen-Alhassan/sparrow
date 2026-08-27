@@ -1,0 +1,300 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-2xpw-w6gg-jr37 (CVE-2025-66471, GHSA-2xpw-w6gg-jr37, PYSEC-2026-1994)
+Package: urllib3 1.26.6
+Fixed in: 2.6.0
+Severity: high
+
+Summary: urllib3 streaming API improperly handles highly compressed data
+
+Details:
+### Impact
+
+urllib3's [streaming API](https://urllib3.readthedocs.io/en/2.5.0/advanced-usage.html#streaming-and-i-o) is designed for the efficient handling of large HTTP responses by reading the content in chunks, rather than loading the entire response body into memory at once.
+
+When streaming a compressed response, urllib3 can perform decoding or decompression based on the HTTP `Content-Encoding` header (e.g., `gzip`, `deflate`, `br`, or `zstd`). The library must read compressed data from the network and decompress it until the requested chunk size is met. Any resulting decompressed data that exceeds the requested amount is held in an internal buffer for the next read operation.
+
+The decompression logic could cause urllib3 to fully decode a small amount of highly compressed data in a single operation. This can result in excessive resource consumption (high CPU usage and massive memory allocation for the decompressed data; CWE-409) on the client side, even if the application only requested a small chunk of data.
+
+
+### Affected usages
+
+Applications and libraries using urllib3 version 2.5.0 and earlier to stream large compressed responses or content from untrusted sources.
+
+`stream()`, `read(amt=256)`, `read1(amt=256)`, `read_chunked(amt=256)`, `readinto(b)` are examples of `urllib3.HTTPResponse` method calls using the affected logic unless decoding is disabled explicitly.
+
+
+### Remediation
+
+Upgrade to at least urllib3 v2.6.0 in which the library avoids decompressing data that exceeds the requested amount.
+
+If your environment contains a package facilitating the Brotli encoding, upgrade to at least Brotli 1.2.0 or brotlicffi 1.2.0.0 too. These versions are enforced by the `urllib3[brotli]` extra in the patched versions of urllib3.
+
+
+### Credits
+
+The issue was reported by @Cycloctane.
+Supplemental information was provided by @stamparm during a security audit performed by [7ASecurity](https://7asecurity.com/) and facilitated by [OSTIF](https://ostif.org/).
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-2xpw-w6gg-jr37
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-66471
+- WEB: https://github.com/urllib3/urllib3/commit/c19571de34c47de3a766541b041637ba5f716ed7
+- PACKAGE: https://github.com/urllib3/urllib3
+
+Fix commit, Python hunks only:
+--- https://github.com/urllib3/urllib3/commit/c19571de34c47de3a766541b041637ba5f716ed7.patch ---
+diff --git a/noxfile.py b/noxfile.py
+index 1228d28028..f558790728 100644
+--- a/noxfile.py
++++ b/noxfile.py
+@@ -15,6 +15,7 @@
+ def tests_impl(
+     session: nox.Session,
+     extras: str | None = None,
++    extra_dependencies: list[str] | None = None,
+     # hypercorn dependency h2 compares bytes and strings
+     # https://github.com/python-hyper/h2/issues/1236
+     byte_string_comparisons: bool = False,
+@@ -33,8 +34,9 @@ def tests_impl(
+     implementation_name, release_level, _is_gil_enabled = session_python_info.split(" ")
+     free_threading = _is_gil_enabled == "False"
+ 
+-    # brotlicffi does not support free-threading
+-    extras = "socks,zstd,h2" if free_threading else "socks,brotli,zstd,h2"
++    if extras is None:
++        # brotlicffi does not support free-threading
++        extras = "socks,zstd,h2" if free_threading else "socks,brotli,zstd,h2"
+ 
+     # Install deps and the package itself.
+     session.run_install(
+@@ -45,6 +47,8 @@ def tests_impl(
+         dependency_group,
+         *(f"--extra={extra}" for extra in (extras.split(",") if extras else ())),
+     )
++    if extra_dependencies:
++        session.install(*extra_dependencies)
+     # Show the uv version.
+     session.run("uv", "--version")
+     # Print the Python version, bytesize and free-threading status.
+@@ -130,8 +134,12 @@ def test_brotlipy(session: nox.Session) -> None:
+     'brotlicffi' that we still don't blow up.
+     """
+     session.env["UV_PROJECT_ENVIRONMENT"] = session.virtualenv.location
+-    session.install("brotlipy")
+-    tests_impl(session, extras="socks", byte_string_comparisons=False)
++    tests_impl(
++        session,
++        extras="socks",
++        extra_dependencies=["brotlipy"],
++        byte_string_comparisons=False,
++    )
+ 
+ 
+ def git_clone(session: nox.Session, git_url: str) -> None:
+diff --git a/src/urllib3/response.py b/src/urllib3/response.py
+index 3df98184de..4ba421369f 100644
+--- a/src/urllib3/response.py
++++ b/src/urllib3/response.py
+@@ -7,6 +7,7 @@
+ import socket
+ import sys
+ import typing
++import warnings
+ import zlib
+ from contextlib import contextmanager
+ from http.client import HTTPMessage as _HttplibHTTPMessage
+@@ -31,6 +32,7 @@
+ from .exceptions import (
+     BodyNotHttplibCompatible,
+     DecodeError,
++    DependencyWarning,
+     HTTPError,
+     IncompleteRead,
+     InvalidChunkLength,
+@@ -50,7 +52,11 @@
+ 
+ 
+ class ContentDecoder:
+-    def decompress(self, data: bytes) -> bytes:
++    def decompress(self, data: bytes, max_length: int = -1) -> bytes:
++        raise NotImplementedError()
++
++    @property
++    def has_unconsumed_tail(self) -> bool:
+         raise NotImplementedError()
+ 
+     def flush(self) -> bytes:
+@@ -60,30 +66,57 @@ def flush(self) -> bytes:
+ class DeflateDecoder(ContentDecoder):
+     def __init__(self) -> None:
+         self._first_try = True
+-        self._data = b""
++        self._first_try_data = b""
++        self._unfed_data = b""
+         self._obj = zlib.decompressobj()
+ 
+-    def decompress(self, data: bytes) -> bytes:
+-        if not data:
++    def decompress(self, data: bytes, max_length: int = -1) -> bytes:
++        data = self._unfed_data + data
++        self._unfed_data = b""
++        if not data and not self._obj.unconsumed_tail:
+             return data
++        original_max_length = max_length
++        if original_max_length < 0:
++            max_length = 0
++        elif original_max_length == 0:
++            # We should not pass 0 to the zlib decompressor because 0 is
++            # the default value that will make zlib decompress without a
++            # length limit.
++            # Data should be stored for subsequent calls.
++            self._unfed_data = data
++            return b""
+ 
++        # Subsequent calls always reuse `self._obj`. zlib requires
++        # passing the unconsumed tail if decompression is to continue.
+         if not self._first_try:
+-            return self._obj.decompress(data)
++            return self._obj.decompress(
++                self._obj.unconsumed_tail + data, max_length=max_length
++            )
+ 
+-        self._data += data
++        # First call tries with RFC 1950 ZLIB format.
++        self._first_try_data += data
+         try:
+-            decompressed = self._obj.decompress(data)
++            decompressed = self._obj.decompress(data, max_length=max_length)
+             if decompressed:
+                 self._first_try = False
+-                self._data = None  # type: ignore[assignment]
++                self._first_try_data = b""
+             return decompressed
++        # On failure, it falls back to RFC 1951 DEFLATE format.
+         except zlib.error:
+             self._first_try = False
+             self._obj = zlib.decompressobj(-zlib.MAX_WBITS)
+             try:
+-                return self.decompress(self._data)
++                return self.decompress(
++                    self._first_try_data, max_length=original_max_length
++                )
+             finally:
+-                self._data = None  # type: ignore[assignment]
++                self._first_try_data = b""
++
++    @property
++    def has_unconsumed_tail(self) -> bool:
++        return bool(self._unfed_data) or (
++            bool(self._obj.unconsumed_tail) and not self._first_try
++        )
+ 
+     def flush(self) -> bytes:
+         return self._obj.flush()
+@@ -99,27 +132,61 @@ class GzipDecoder(ContentDecoder):
+     def __init__(self) -> None:
+         self._obj = zlib.decompressobj(16 + zlib.MAX_WBITS)
+         self._state = GzipDecoderState.FIRST_MEMBER
++        self._unconsumed_tail = b""
+ 
+-    def decompress(self, data: bytes) -> bytes:
++    def decompress(self, data: bytes, max_length: int = -1) -> bytes:
+         ret = bytearray()
+-        if self._state == GzipDecoderState.SWALLOW_DATA or not data:
++        if self._state == GzipDecoderState.SWALLOW_DATA:
++            return bytes(ret)
++
++        if max_length == 0:
++            # We should not pass 0 to the zlib decompressor because 0 is
++            # the default value that will make zlib decompress without a
++            # length limit.
++            # Data should be stored for subsequent calls.
++            self._unconsumed_tail += data
++            return b""
++
++        # zlib requires passing the unconsumed tail to the subsequent
++        # call if decompression is to continue.
++        data = self._unconsumed_tail + data
++        if not data and self._obj.eof:
+             return bytes(ret)
++
+         while True:
+             try:
+-                ret += self._obj.decompress(data)
++                ret += self._obj.decompress(
++                    data, max_length=max(max_length - len(ret), 0)
++                )
+             except zlib.error:
+                 previous_state = self._state
+                 # Ignore data after the first error
+                 self._state = GzipDecoderState.SWALLOW_DATA
++                self._unconsumed_tail = b""
+                 if previous_state == GzipDecoderState.OTHER_MEMBERS:
+                     # Allow trailing garbage acceptable in other gzip clients
+                     return bytes(ret)
+                 raise
+-            data = self._obj.unused_data
++
++            self._unconsumed_tail = data = (
++                self._obj.unconsumed_tail or self._obj.unused_data
++            )
++            if max_length > 0 and len(ret) >= max_length:
++                break
++
+             if not data:
+                 return bytes(ret)
+-            self._state = GzipDecoderState.OTHER_MEMBERS
+-            self._obj = zlib.decompressobj(16 + zlib.MAX_WBITS)
++            # When the end of a gzip member is reached, a new decompressor
++            # must be created for unused (possibly future) data.
++            if self._obj.eof:
++                self._state = GzipDecoderState.OTHER_MEMBERS
++                self._obj = zlib.decompressobj(16 + zlib.MAX_WBITS)
++
++        return bytes(ret)
++
++    @property
++    def has_unconsumed_tail(self) -> bool:
++        return bool(self._unconsumed_tail)
+ 
+     def flush(self) -> bytes:
+         return self._obj.flush()
+@@ -134,9 +201,35 @@ class BrotliDecoder(ContentDecoder):
+         def __init__(self) -> None:
+             self._obj = brotli.Decompressor()
+             if hasattr(self._obj, "decompress"):
+-                setattr(self, "decompress", self._obj.decompress)
++                setattr(self, "_decompress", self._obj.decompress)
+             else:
+-                setattr(self, "decompress", self._obj.process)
++                setattr(self, "_decompress", self._obj.process)
++
++        # Requires Brotli >= 1.2.0 for `output_buffer_limit`.
++        def _decompress(self, data: bytes, output_buffer_limit: int = -1) -> bytes:
++            raise NotImplementedError()
++
++        def decompress(self, data: bytes, max_length: int = -1) -> bytes:
++            try:
++                if max_length > 0:
++                    return self._decompress(data, output_buffer_limit=max_length)
++                else:
++                    return self._decompress(data)
++            except TypeError:
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-2xpw-w6gg-jr37", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

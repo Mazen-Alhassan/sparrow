@@ -1,0 +1,287 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-q34m-jh98-gwm2 (CVE-2024-49767, GHSA-q34m-jh98-gwm2, PYSEC-2026-1860, PYSEC-2026-3417)
+Package: werkzeug 2.3.3
+Fixed in: 3.0.6
+Severity: moderate
+
+Summary: Werkzeug possible resource exhaustion when parsing file data in forms
+
+Details:
+Applications using Werkzeug to parse `multipart/form-data` requests are vulnerable to resource exhaustion. A specially crafted form body can bypass the `Request.max_form_memory_size` setting.
+
+
+The `Request.max_content_length` setting, as well as resource limits provided by deployment software and platforms, are also available to limit the resources used during a request. This vulnerability does not affect those settings. All three types of limits should be considered and set appropriately when deploying an application.
+
+References:
+- WEB: https://github.com/pallets/werkzeug/security/advisories/GHSA-q34m-jh98-gwm2
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-49767
+- WEB: https://github.com/pallets/quart/commit/5e78c4169b8eb66b91ead3e62d44721b9e1644ee
+- WEB: https://github.com/pallets/quart/commit/abb04a512496206de279225340ed022852fbf51f
+- WEB: https://github.com/pallets/werkzeug/commit/50cfeebcb0727e18cc52ffbeb125f4a66551179b
+- WEB: https://github.com/pallets/werkzeug/commit/cbb446fdcada7685fce936ded01b76c08dbd6eb5
+- PACKAGE: https://github.com/pallets/werkzeug
+- WEB: https://github.com/pallets/werkzeug/releases/tag/3.0.6
+- WEB: https://security.netapp.com/advisory/ntap-20250103-0007
+
+Fix commit, Python hunks only:
+--- https://github.com/pallets/quart/commit/5e78c4169b8eb66b91ead3e62d44721b9e1644ee.patch ---
+diff --git a/src/quart/formparser.py b/src/quart/formparser.py
+index eab878a6..b8b0e528 100644
+--- a/src/quart/formparser.py
++++ b/src/quart/formparser.py
+@@ -15,6 +15,7 @@
+ from urllib.parse import parse_qsl
+ 
+ from werkzeug.datastructures import Headers, MultiDict
++from werkzeug.exceptions import RequestEntityTooLarge
+ from werkzeug.formparser import default_stream_factory
+ from werkzeug.http import parse_options_header
+ from werkzeug.sansio.multipart import Data, Epilogue, Field, File, MultipartDecoder, NeedData
+@@ -173,19 +174,28 @@ async def parse(
+         files = []
+ 
+         current_part: Field | File
++        field_size: int | None = None
+         async for data in body:
+             parser.receive_data(data)
+             event = parser.next_event()
+             while not isinstance(event, (Epilogue, NeedData)):
+                 if isinstance(event, Field):
+                     current_part = event
++                    field_size = 0
+                     container = []
+                     _write = container.append
+                 elif isinstance(event, File):
+                     current_part = event
++                    field_size = None
+                     container = self.start_file_streaming(event, content_length)
+                     _write = container.write
+                 elif isinstance(event, Data):
++                    if field_size is not None:
++                        field_size += len(event.data)
++
++                        if field_size > self.max_form_memory_size:
++                            raise RequestEntityTooLarge()
++
+                     _write(event.data)
+                     if not event.more_data:
+                         if isinstance(current_part, Field):
+diff --git a/tests/test_formparser.py b/tests/test_formparser.py
+index 00000000..c5e85f22
+--- /dev/null
++++ b/tests/test_formparser.py
+@@ -0,0 +1,21 @@
++from __future__ import annotations
++
++import pytest
++from werkzeug.exceptions import RequestEntityTooLarge
++
++from quart.formparser import MultiPartParser
++from quart.wrappers.request import Body
++
++
++async def test_multipart_max_form_memory_size() -> None:
++    """max_form_memory_size is tracked across multiple data events."""
++    data = b"--bound\r\nContent-Disposition: form-field; name=a\r\n\r\n"
++    data += b"a" * 15 + b"\r\n--bound--"
++    body = Body(None, None)
++    body.set_result(data)
++    # The buffer size is less than the max size, so multiple data events will be
++    # returned. The field size is greater than the max.
++    parser = MultiPartParser(max_form_memory_size=10, buffer_size=5)
++
++    with pytest.raises(RequestEntityTooLarge):
++        await parser.parse(body, b"bound", 0)
+
+--- https://github.com/pallets/quart/commit/abb04a512496206de279225340ed022852fbf51f.patch ---
+diff --git a/src/quart/app.py b/src/quart/app.py
+index 03813e6c..6a3e4229 100644
+--- a/src/quart/app.py
++++ b/src/quart/app.py
+@@ -248,6 +248,8 @@ class Quart(App):
+             "EXPLAIN_TEMPLATE_LOADING": False,
+             "MAX_CONTENT_LENGTH": 16 * 1024 * 1024,  # 16 MB Limit
+             "MAX_COOKIE_SIZE": 4093,
++            "MAX_FORM_MEMORY_SIZE": 500_000,
++            "MAX_FORM_PARTS": 1_000,
+             "PERMANENT_SESSION_LIFETIME": timedelta(days=31),
+             # Replaces PREFERRED_URL_SCHEME to allow for WebSocket scheme
+             "PREFER_SECURE_URLS": False,
+@@ -1130,8 +1132,9 @@ async def handle_websocket_exception(
+ 
+     def log_exception(
+         self,
+-        exception_info: tuple[type, BaseException, TracebackType]
+-        | tuple[None, None, None],
++        exception_info: (
++            tuple[type, BaseException, TracebackType] | tuple[None, None, None]
++        ),
+     ) -> None:
+         """Log a exception to the :attr:`logger`.
+ 
+diff --git a/src/quart/formparser.py b/src/quart/formparser.py
+index e8ea6e16..50e7ee43 100644
+--- a/src/quart/formparser.py
++++ b/src/quart/formparser.py
+@@ -43,15 +43,20 @@ class FormDataParser:
+ 
+     def __init__(
+         self,
+-        stream_factory: StreamFactory = default_stream_factory,
+-        max_form_memory_size: int | None = None,
+-        max_content_length: int | None = None,
++        *,
+         cls: type[MultiDict] | None = MultiDict,
++        max_content_length: int | None = None,
++        max_form_memory_size: int | None = None,
++        max_form_parts: int | None = None,
+         silent: bool = True,
++        stream_factory: StreamFactory = default_stream_factory,
+     ) -> None:
+-        self.stream_factory = stream_factory
+         self.cls = cls
++        self.max_content_length = max_content_length
++        self.max_form_memory_size = max_form_memory_size
++        self.max_form_parts = max_form_parts
+         self.silent = silent
++        self.stream_factory = stream_factory
+ 
+     def get_parse_func(
+         self, mimetype: str, options: dict[str, str]
+@@ -87,9 +92,12 @@ async def _parse_multipart(
+         options: dict[str, str],
+     ) -> tuple[MultiDict, MultiDict]:
+         parser = MultiPartParser(
+-            self.stream_factory,
+             cls=self.cls,
+             file_storage_cls=self.file_storage_class,
++            max_content_length=self.max_content_length,
++            max_form_memory_size=self.max_form_memory_size,
++            max_form_parts=self.max_form_parts,
++            stream_factory=self.stream_factory,
+         )
+         boundary = options.get("boundary", "").encode("ascii")
+ 
+@@ -105,10 +113,14 @@ async def _parse_urlencoded(
+         content_length: int | None,
+         options: dict[str, str],
+     ) -> tuple[MultiDict, MultiDict]:
+-        form = parse_qsl(
+-            (await body).decode(),
+-            keep_blank_values=True,
+-        )
++        try:
++            form = parse_qsl(
++                (await body).decode(),
++                keep_blank_values=True,
++                max_num_fields=self.max_form_parts,
++            )
++        except ValueError:
++            raise RequestEntityTooLarge() from None
+         return self.cls(form), self.cls()
+ 
+     parse_functions: dict[str, ParserFunc] = {
+@@ -121,17 +133,22 @@ async def _parse_urlencoded(
+ class MultiPartParser:
+     def __init__(
+         self,
+-        stream_factory: StreamFactory = default_stream_factory,
+-        max_form_memory_size: int | None = None,
+-        cls: type[MultiDict] = MultiDict,
++        *,
+         buffer_size: int = 64 * 1024,
++        cls: type[MultiDict] = MultiDict,
+         file_storage_cls: type[FileStorage] = FileStorage,
++        max_content_length: int | None = None,
++        max_form_memory_size: int | None = None,
++        max_form_parts: int | None = None,
++        stream_factory: StreamFactory = default_stream_factory,
+     ) -> None:
+-        self.max_form_memory_size = max_form_memory_size
+-        self.stream_factory = stream_factory
+-        self.cls = cls
+         self.buffer_size = buffer_size
++        self.cls = cls
+         self.file_storage_cls = file_storage_cls
++        self.max_content_length = max_content_length
++        self.max_form_memory_size = max_form_memory_size
++        self.max_form_parts = max_form_parts
++        self.stream_factory = stream_factory
+ 
+     def fail(self, message: str) -> NoReturn:
+         raise ValueError(message)
+@@ -172,7 +189,9 @@ async def parse(
+         container: IO[bytes] | list[bytes]
+         _write: Callable[[bytes], Any]
+ 
+-        parser = MultipartDecoder(boundary, self.max_form_memory_size)
++        parser = MultipartDecoder(
++            boundary, self.max_content_length, max_parts=self.max_form_parts
++        )
+ 
+         fields = []
+         files = []
+diff --git a/src/quart/wrappers/base.py b/src/quart/wrappers/base.py
+index 6f458ce1..e33caabd 100644
+--- a/src/quart/wrappers/base.py
++++ b/src/quart/wrappers/base.py
+@@ -8,7 +8,6 @@
+ from werkzeug.sansio.request import Request as SansIORequest
+ 
+ from .. import json
+-from ..globals import current_app
+ 
+ if TYPE_CHECKING:
+     from ..routing import QuartRule  # noqa
+@@ -73,14 +72,6 @@ def __init__(
+         self.http_version = http_version
+         self.scope = scope
+ 
+-    @property
+-    def max_content_length(self) -> int | None:
+-        """Read-only view of the ``MAX_CONTENT_LENGTH`` config key."""
+-        if current_app:
+-            return current_app.config["MAX_CONTENT_LENGTH"]
+-        else:
+-            return None
+-
+     @property
+     def endpoint(self) -> str | None:
+         """Returns the corresponding endpoint matched for this request.
+diff --git a/src/quart/wrappers/request.py b/src/quart/wrappers/request.py
+index cf50b6f5..1cf2b2f7 100644
+--- a/src/quart/wrappers/request.py
++++ b/src/quart/wrappers/request.py
+@@ -141,6 +141,9 @@ class Request(BaseRequestWebsocket):
+     body_class = Body
+     form_data_parser_class = FormDataParser
+     lock_class = asyncio.Lock
++    _max_content_length: int | None = None
++    _max_form_memory_size: int | None = None
++    _max_form_parts: int | None = None
+ 
+     def __init__(
+         self,
+@@ -189,6 +192,48 @@ def __init__(
+         self._parsing_lock = self.lock_class()
+         self._send_push_promise = send_push_promise
+ 
++    @property
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-q34m-jh98-gwm2", "package": "werkzeug", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

@@ -1,0 +1,44 @@
+{
+  "advisory": "GHSA-mf9w-mj56-hr94",
+  "package": "python-dotenv",
+  "sinks": [
+    "dotenv.main.rewrite",
+    "dotenv.main.set_key",
+    "dotenv.main.unset_key"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 790c5c0 rewrites the rewrite context manager in src/dotenv/main.py to stop following symlinks and threads a follow_symlinks flag through set_key and unset_key",
+  "assumptions": [
+    "assumes rewrite is the sink and its two callers are included because the flag was added to their signatures"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "dotenv.main.rewrite": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.19.0",
+      "fixed_version": "1.2.2",
+      "note": "body differs between 0.19.0 and 1.2.2",
+      "location": "dotenv.main:rewrite"
+    },
+    "dotenv.main.set_key": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.19.0",
+      "fixed_version": "1.2.2",
+      "note": "body differs between 0.19.0 and 1.2.2",
+      "location": "dotenv.main:set_key"
+    },
+    "dotenv.main.unset_key": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.19.0",
+      "fixed_version": "1.2.2",
+      "note": "body differs between 0.19.0 and 1.2.2",
+      "location": "dotenv.main:unset_key"
+    }
+  }
+}

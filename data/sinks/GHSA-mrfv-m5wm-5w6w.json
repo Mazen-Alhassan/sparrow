@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-mrfv-m5wm-5w6w",
+  "package": "pynacl",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the fix is in libsodium's C source, which pynacl vendors and calls through cffi",
+  "assumptions": [
+    "assumes a vendored C fix has no Python sink",
+    "the Python entry point is nacl.bindings.crypto_core_ed25519_is_valid_point, which was not changed"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

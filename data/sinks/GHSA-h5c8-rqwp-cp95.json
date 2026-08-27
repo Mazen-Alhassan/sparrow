@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-h5c8-rqwp-cp95",
+  "package": "jinja2",
+  "sinks": [
+    "jinja2.filters.do_xmlattr"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 7167953 rewrites do_xmlattr in src/jinja2/filters.py to reject keys containing whitespace",
+  "assumptions": [
+    "assumes the filter function is the sink; it is only invoked through the template engine's filter table, never called directly by application code"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "jinja2.filters.do_xmlattr": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.1.2",
+      "fixed_version": "3.1.3",
+      "note": "body differs between 3.1.2 and 3.1.3",
+      "location": "jinja2.filters:do_xmlattr"
+    }
+  }
+}

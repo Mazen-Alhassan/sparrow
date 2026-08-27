@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-6vqw-3v5j-54x4",
+  "package": "cryptography",
+  "sinks": [
+    "cryptography.hazmat.backends.openssl.backend.Backend.serialize_key_and_certificates_to_pkcs12"
+  ],
+  "confidence": "high",
+  "evidence": "pull request 10423 adds a NULL check inside serialize_key_and_certificates_to_pkcs12 in the openssl backend",
+  "assumptions": [
+    "assumes the public wrapper cryptography.hazmat.primitives.serialization.pkcs12.serialize_key_and_certificates is not itself the sink, only the caller"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "cryptography.hazmat.backends.openssl.backend.Backend.serialize_key_and_certificates_to_pkcs12": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "41.0.2",
+      "fixed_version": "42.0.4",
+      "note": "body differs between 41.0.2 and 42.0.4",
+      "location": "cryptography.hazmat.backends.openssl.backend:Backend.serialize_key_and_certificates_to_pkcs12"
+    }
+  }
+}

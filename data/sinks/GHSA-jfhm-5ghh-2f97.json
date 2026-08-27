@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-jfhm-5ghh-2f97",
+  "package": "cryptography",
+  "sinks": [
+    "cryptography.hazmat.backends.openssl.backend.Backend._load_pkcs7_certificates"
+  ],
+  "confidence": "high",
+  "evidence": "pull request 9926 adds a NULL check at the top of _load_pkcs7_certificates in the openssl backend",
+  "assumptions": [
+    "assumes the public loaders load_pem_pkcs7_certificates and load_der_pkcs7_certificates are callers, not the sink"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "cryptography.hazmat.backends.openssl.backend.Backend._load_pkcs7_certificates": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "41.0.2",
+      "fixed_version": "41.0.6",
+      "note": "body differs between 41.0.2 and 41.0.6",
+      "location": "cryptography.hazmat.backends.openssl.backend:Backend._load_pkcs7_certificates"
+    }
+  }
+}

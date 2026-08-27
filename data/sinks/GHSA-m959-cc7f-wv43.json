@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-m959-cc7f-wv43",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked, and name constraint validation is implemented in the compiled rust extension",
+  "assumptions": [
+    "assumes the fix is in Rust like the two related path validation advisories",
+    "if a Python function did change, this empty answer is a miss"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

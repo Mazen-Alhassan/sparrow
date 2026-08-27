@@ -1,0 +1,35 @@
+{
+  "advisory": "PYSEC-2026-2132",
+  "package": "click",
+  "sinks": [
+    "click.termui.edit",
+    "click._termui_impl.Editor.edit_file"
+  ],
+  "confidence": "medium",
+  "evidence": "no fix commit is linked; the advisory names click.edit(), which is click.termui.edit and delegates to the Editor implementation that builds a shell command",
+  "assumptions": [
+    "the module split between click.termui and click._termui_impl was inferred from click's structure, not from a diff",
+    "the shell invocation is in Editor.edit_file, which is the more precise sink"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "click.termui.edit": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "8.1.3",
+      "fixed_version": "8.3.3",
+      "note": "body differs between 8.1.3 and 8.3.3",
+      "location": "click.termui:edit"
+    },
+    "click._termui_impl.Editor.edit_file": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "8.1.3",
+      "fixed_version": "8.3.3",
+      "note": "removed in 8.3.3",
+      "location": "click._termui_impl:Editor.edit_file"
+    }
+  }
+}

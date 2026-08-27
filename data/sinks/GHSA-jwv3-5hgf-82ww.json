@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-jwv3-5hgf-82ww",
+  "package": "cryptography",
+  "sinks": [],
+  "confidence": "high",
+  "evidence": "the advisory quotes Rust source for build_chain_inner; the X.509 path builder lives in the compiled rust extension, not in Python",
+  "assumptions": [
+    "assumes a Rust-side fix has no Python sink",
+    "the Python entry point is cryptography.x509.verification.ClientVerifier.verify, which was not changed"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

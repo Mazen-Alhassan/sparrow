@@ -1,0 +1,36 @@
+{
+  "advisory": "GHSA-5wmx-573v-2qwq",
+  "package": "markdown",
+  "sinks": [
+    "markdown.htmlparser.HTMLExtractor.parse_html_declaration",
+    "markdown.extensions.md_in_html.HTMLExtractorExtra.parse_html_declaration"
+  ],
+  "confidence": "medium",
+  "evidence": "pull request 1535 adds a bogus comment override to parse_html_declaration in both markdown/htmlparser.py and markdown/extensions/md_in_html.py",
+  "assumptions": [
+    "the advisory text says the flaw is in 3.8 while OSV flags this 3.3.4 pin, so the function may not exist in the pinned version",
+    "the class in md_in_html may be named differently in 3.3.4",
+    "the AssertionError is raised inside the stdlib html.parser, so the sink is the caller that fails to catch it"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "markdown.htmlparser.HTMLExtractor.parse_html_declaration": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.3.4",
+      "fixed_version": "3.8.1",
+      "note": "body differs between 3.3.4 and 3.8.1",
+      "location": "markdown.htmlparser:HTMLExtractor.parse_html_declaration"
+    },
+    "markdown.extensions.md_in_html.HTMLExtractorExtra.parse_html_declaration": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "3.3.4",
+      "fixed_version": "3.8.1",
+      "note": "body differs between 3.3.4 and 3.8.1",
+      "location": "markdown.extensions.md_in_html:HTMLExtractorExtra.parse_html_declaration"
+    }
+  }
+}

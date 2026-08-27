@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-87hc-h4r5-73f7",
+  "package": "werkzeug",
+  "sinks": [
+    "werkzeug.security.safe_join"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 7ae1d25 changes the device name test inside safe_join and widens the _windows_device_files set",
+  "assumptions": [
+    "assumes the flaw is in safe_join rather than in send_from_directory, its caller",
+    "the set _windows_device_files is a module level constant and cannot be named as a function sink"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "werkzeug.security.safe_join": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.1.5",
+      "note": "body differs between 2.3.3 and 3.1.5",
+      "location": "werkzeug.security:safe_join"
+    }
+  }
+}

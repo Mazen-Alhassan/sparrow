@@ -1,0 +1,26 @@
+{
+  "advisory": "GHSA-752w-5fwx-jx9f",
+  "package": "pyjwt",
+  "sinks": [
+    "jwt.api_jws.PyJWS._verify_signature"
+  ],
+  "confidence": "low",
+  "evidence": "no fix commit is linked; the missing crit header validation belongs in the JWS header handling that runs during decode",
+  "assumptions": [
+    "the function name was inferred from where header validation happens in PyJWT, not from a diff",
+    "the fix may add a new helper rather than change _verify_signature, in which case this sink will fail verification",
+    "2.4.0 may name the method differently"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "jwt.api_jws.PyJWS._verify_signature": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.4.0",
+      "fixed_version": "2.12.0",
+      "note": "body differs between 2.4.0 and 2.12.0",
+      "location": "jwt.api_jws:PyJWS._verify_signature"
+    }
+  }
+}

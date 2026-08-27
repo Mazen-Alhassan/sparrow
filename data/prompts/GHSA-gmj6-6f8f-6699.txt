@@ -1,0 +1,94 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-gmj6-6f8f-6699 (CVE-2024-56201, GHSA-gmj6-6f8f-6699, PYSEC-2026-1472)
+Package: jinja2 3.1.2
+Fixed in: 3.1.5
+Severity: moderate
+
+Summary: Jinja has a sandbox breakout through malicious filenames
+
+Details:
+A bug in the Jinja compiler allows an attacker that controls both the content and filename of a template to execute arbitrary Python code, regardless of if Jinja's sandbox is used.
+
+To exploit the vulnerability, an attacker needs to control both the filename and the contents of a template. Whether that is the case depends on the type of application using Jinja. This vulnerability impacts users of applications which execute untrusted templates where the template author can also choose the template filename.
+
+References:
+- WEB: https://github.com/pallets/jinja/security/advisories/GHSA-gmj6-6f8f-6699
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-56201
+- WEB: https://github.com/pallets/jinja/issues/1792
+- WEB: https://github.com/pallets/jinja/commit/767b23617628419ae3709ccfb02f9602ae9fe51f
+- PACKAGE: https://github.com/pallets/jinja
+- WEB: https://github.com/pallets/jinja/releases/tag/3.1.5
+
+Fix commit, Python hunks only:
+--- https://github.com/pallets/jinja/commit/767b23617628419ae3709ccfb02f9602ae9fe51f.patch ---
+diff --git a/src/jinja2/compiler.py b/src/jinja2/compiler.py
+index 074e9b187..23295ec1f 100644
+--- a/src/jinja2/compiler.py
++++ b/src/jinja2/compiler.py
+@@ -1141,9 +1141,14 @@ def visit_FromImport(self, node: nodes.FromImport, frame: Frame) -> None:
+             )
+             self.writeline(f"if {frame.symbols.ref(alias)} is missing:")
+             self.indent()
++            # The position will contain the template name, and will be formatted
++            # into a string that will be compiled into an f-string. Curly braces
++            # in the name must be replaced with escapes so that they will not be
++            # executed as part of the f-string.
++            position = self.position(node).replace("{", "{{").replace("}", "}}")
+             message = (
+                 "the template {included_template.__name__!r}"
+-                f" (imported on {self.position(node)})"
++                f" (imported on {position})"
+                 f" does not export the requested name {name!r}"
+             )
+             self.writeline(
+diff --git a/tests/test_compile.py b/tests/test_compile.py
+index 42efa59c0..e1a5391ea 100644
+--- a/tests/test_compile.py
++++ b/tests/test_compile.py
+@@ -1,6 +1,9 @@
+ import os
+ import re
+ 
++import pytest
++
++from jinja2 import UndefinedError
+ from jinja2.environment import Environment
+ from jinja2.loaders import DictLoader
+ 
+@@ -87,3 +90,19 @@ def test_block_set_vars_unpacking_deterministic(tmp_path):
+         content,
+     )[:10]
+     assert found == expect
++
++
++def test_undefined_import_curly_name():
++    env = Environment(
++        loader=DictLoader(
++            {
++                "{bad}": "{% from 'macro' import m %}{{ m() }}",
++                "macro": "",
++            }
++        )
++    )
++
++    # Must not raise `NameError: 'bad' is not defined`, as that would indicate
++    # that `{bad}` is being interpreted as an f-string. It must be escaped.
++    with pytest.raises(UndefinedError):
++        env.get_template("{bad}").render()
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-gmj6-6f8f-6699", "package": "jinja2", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

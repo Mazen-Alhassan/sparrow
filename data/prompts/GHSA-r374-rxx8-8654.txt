@@ -1,0 +1,239 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-r374-rxx8-8654 (CVE-2026-44405, GHSA-r374-rxx8-8654, PYSEC-2026-2858)
+Package: paramiko 2.11.0
+Fixed in: unknown
+Severity: low
+
+Summary: Paramiko rsakey.py allows the SHA-1 algorithm
+
+Details:
+In Paramiko through 4.0.0 before a448945, rsakey.py allows the SHA-1 algorithm.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-44405
+- WEB: https://github.com/paramiko/paramiko/commit/a4489456b6f65281e172380cc4826cee5e851dbb
+- PACKAGE: https://github.com/paramiko/paramiko
+- WEB: https://ostif.org/wp-content/uploads/2026/05/25-11-2415-REP_paramiko-security-audit_v1.1.pdf
+
+Fix commit, Python hunks only:
+--- https://github.com/paramiko/paramiko/commit/a4489456b6f65281e172380cc4826cee5e851dbb.patch ---
+diff --git a/paramiko/auth_handler.py b/paramiko/auth_handler.py
+index b1120581b..f088912f4 100644
+--- a/paramiko/auth_handler.py
++++ b/paramiko/auth_handler.py
+@@ -614,7 +614,13 @@ def _parse_userauth_request(self, m):
+             # NOTE: server never wants to guess a client's algo, they're
+             # telling us directly. No need for _finalize_pubkey_algorithm
+             # anywhere in this flow.
++            # TODO: ok is this a spot where it can say a SHA2 dealie in some
++            # fields but still ssh-rsa within the pubkey blob part?
++            # TODO: ok so this would be rsa-sha2-256 or w/e, if this field says
++            # ssh-rsa the request can get stuffed.
+             algorithm = m.get_text()
++            # TODO: This part would, if deconstructed, still be allowed to have
++            # "ssh-rsa" in its first field.
+             keyblob = m.get_binary()
+             try:
+                 key = self._generate_key_from_request(algorithm, keyblob)
+diff --git a/paramiko/client.py b/paramiko/client.py
+index 1a5a76301..90da5cc61 100644
+--- a/paramiko/client.py
++++ b/paramiko/client.py
+@@ -439,10 +439,32 @@ def connect(
+ 
+         our_server_keys = self._system_host_keys.get(server_hostkey_name)
+         if our_server_keys is None:
++            # TODO: this is getting us the test suite _test_connection host key
++            # setup by virtue of that code doing tc.get_host_keys().add() (that
++            # method wraps self._host_keys)
++            # TODO: it should be analogous to running paramiko w/ a
++            # ~/.ssh/known_hosts file
+             our_server_keys = self._host_keys.get(server_hostkey_name)
+         if our_server_keys is not None:
++            # TODO: keytype needs to turn into one of the rsa-sha2 keys if it's
++            # an RSAKey.
++            # TODO: where is the equivalent on our server-side? hopefully the
++            # tests exercise that lol
++            # TODO: also, is it just me or does this [0] mean we literally do
++            # not actually implement real HostKeyAlgorithms agreement like
++            # ssh.c does?! eesh
+             keytype = our_server_keys.keys()[0]
+             sec_opts = t.get_security_options()
++            # TODO: clean this up a bit, but it does help some tests pass!
++            if keytype == "ssh-rsa":
++                if "rsa-sha2-512" in sec_opts.key_types:
++                    keytype = "rsa-sha2-512"
++                elif "rsa-sha2-256" in sec_opts.key_types:
++                    keytype = "rsa-sha2-256"
++                else:
++                    raise Exception(
++                        "TODO: REPLACEME with appropriate exception for 'what even is this key type in your known_hosts files?'"
++                    )
+             other_types = [x for x in sec_opts.key_types if x != keytype]
+             sec_opts.key_types = [keytype] + other_types
+ 
+@@ -459,6 +481,10 @@ def connect(
+                     self, server_hostkey_name, server_key
+                 )
+             else:
++                # TODO: this should 'just work' but dblcheck (HostKeys will be
++                # offering an ssh-rsa-via-sha2 key as "ssh-rsa" still, and the
++                # key would be RSAKey whose .get_name would still say
++                # "ssh-rsa")
+                 our_key = our_server_keys.get(server_key.get_name())
+                 if our_key != server_key:
+                     if our_key is None:
+diff --git a/paramiko/config.py b/paramiko/config.py
+index af4ccc588..0fe2b3486 100644
+--- a/paramiko/config.py
++++ b/paramiko/config.py
+@@ -445,6 +445,7 @@ def _tokenize(self, config, target_hostname, key, value):
+         # The actual tokens!
+         replacements = {
+             # TODO: %%???
++            # TODO: sha1 bad / this is offspec from rfc/openssh
+             "%C": sha1(tohash.encode()).hexdigest(),
+             "%d": homedir,
+             "%h": configured_hostname,
+diff --git a/paramiko/rsakey.py b/paramiko/rsakey.py
+index b00888810..5ca435441 100644
+--- a/paramiko/rsakey.py
++++ b/paramiko/rsakey.py
+@@ -38,8 +38,6 @@ class RSAKey(PKey):
+ 
+     name = "ssh-rsa"
+     HASHES = {
+-        "ssh-rsa": hashes.SHA1,
+-        "ssh-rsa-cert-v01@openssh.com": hashes.SHA1,
+         "rsa-sha2-256": hashes.SHA256,
+         "rsa-sha2-256-cert-v01@openssh.com": hashes.SHA256,
+         "rsa-sha2-512": hashes.SHA512,
+@@ -81,7 +79,14 @@ def __init__(
+ 
+     @classmethod
+     def identifiers(cls):
+-        return list(cls.HASHES.keys())
++        # NOTE: we no longer want to have ssh-rsa+SHA1 in HASHES but we still
++        # need to advertise we can be used to read ssh-rsa keys (w/ assumption
++        # other parts of system will enforce the use of SHA2 signing algos).
++        # Thus, just say so here.
++        return list(cls.HASHES.keys()) + [
++            "ssh-rsa",
++            "ssh-rsa-cert-v01@openssh.com",
++        ]
+ 
+     @property
+     def size(self):
+@@ -126,8 +131,8 @@ def sign_ssh_data(self, data, algorithm=None):
+         sig = self.key.sign(
+             data,
+             padding=padding.PKCS1v15(),
+-            # HASHES being just a map from long identifier to either SHA1 or
+-            # SHA256 - cert'ness is not truly relevant.
++            # HASHES being just a map from long identifier to algo; cert'ness
++            # is not truly relevant.
+             algorithm=self.HASHES[algorithm](),
+         )
+         m = Message()
+diff --git a/paramiko/sftp_server.py b/paramiko/sftp_server.py
+index 9575e62b1..dff7d9088 100644
+--- a/paramiko/sftp_server.py
++++ b/paramiko/sftp_server.py
+@@ -79,6 +79,7 @@
+ from paramiko.sftp_si import SFTPServerInterface
+ from paramiko.util import b
+ 
++# TODO: nuke or update w/ newer algs, see below
+ _hash_class = {"sha1": sha1, "md5": md5}
+ 
+ 
+@@ -302,6 +303,9 @@ def _check_file(self, request_number, msg):
+             return
+         f = self.file_table[handle]
+         for x in alg_list:
++            # TODO: this only contains sha1 and md5 so uh, is this extension
++            # actually supported anymore? do we need to update the map for
++            # newer algos instead? other?
+             if x in _hash_class:
+                 algname = x
+                 alg = _hash_class[x]
+diff --git a/paramiko/transport.py b/paramiko/transport.py
+index 2e06afa42..9e9acf4e1 100644
+--- a/paramiko/transport.py
++++ b/paramiko/transport.py
+@@ -204,7 +204,6 @@ class Transport(threading.Thread, ClosingContextManager):
+         "ecdsa-sha2-nistp521",
+         "rsa-sha2-512",
+         "rsa-sha2-256",
+-        "ssh-rsa",
+     )
+     # ~= PubkeyAcceptedAlgorithms
+     _preferred_pubkeys = (
+@@ -214,7 +213,6 @@ class Transport(threading.Thread, ClosingContextManager):
+         "ecdsa-sha2-nistp521",
+         "rsa-sha2-512",
+         "rsa-sha2-256",
+-        "ssh-rsa",
+     )
+     _preferred_kex = (
+         "ecdh-sha2-nistp256",
+@@ -307,12 +305,18 @@ class Transport(threading.Thread, ClosingContextManager):
+     }
+ 
+     _key_info = {
+-        # TODO: at some point we will want to drop this as it's no longer
+-        # considered secure due to using SHA-1 for signatures. OpenSSH 8.8 no
+-        # longer supports it. Question becomes at what point do we want to
+-        # prevent users with older setups from using this?
+-        "ssh-rsa": RSAKey,
+-        "ssh-rsa-cert-v01@openssh.com": RSAKey,
++        # TODO: do some downstream uses of this need to be able to 'see'
++        # ssh-rsa in not-using-SHA1 contexts?
++        # TODO: NO!!! good.
++        # TODO: it's used in:
++        # - Transport._verify_key - verification - do not want ssh-rsa
++        # - SecurityOptions - only really uses this as a filter for what's
++        # allowed to be overwritten into its .key_types (which ==
++        # transport._preferred_keys), and since the latter doesn't want ssh-rsa
++        # in it, this use case doesn't require that string in here either.
++        # - AuthHandler._generate_key_from_request - server-side auth
++        # support - is looking at the 'algorithm' field in the request when it
++        # references this structure, so yup, do not want ssh-rsa
+         "rsa-sha2-256": RSAKey,
+         "rsa-sha2-256-cert-v01@openssh.com": RSAKey,
+         "rsa-sha2-512": RSAKey,
+@@ -1396,11 +1400,13 @@ def connect(
+             # TODO: a more robust implementation would be to ask each key class
+             # for its nameS plural, and just use that.
+             # TODO: that could be used in a bunch of other spots too
++            # TODO: don't we have that now, lol
++            # TODO: either way this is ~= like using SecurityOptions.key_types
++            # = xxx, but different, which sucks sigh
+             if isinstance(hostkey, RSAKey):
+                 self._preferred_keys = [
+                     "rsa-sha2-512",
+                     "rsa-sha2-256",
+-                    "ssh-rsa",
+                 ]
+             else:
+                 self._preferred_keys = [hostkey.get_name()]
+@@ -2002,6 +2008,8 @@ def _verify_key(self, host_key, sig):
+         key: PKey = self._key_info[self.host_key_type](Message(host_key))
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-r374-rxx8-8654", "package": "paramiko", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

@@ -1,0 +1,406 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-prg7-hcfm-mfcr (CVE-2026-59893)
+Package: sqlparse 0.4.4
+Fixed in: 0.6.0
+Severity: high
+
+Summary: sqlparse: Inefficient Regex Handling of Dollar-Quoted SQL Literals Leads to ReDoS (Denial of Service)
+
+Details:
+### Summary
+
+sqlparse contains a Regular Expression Denial of Service (ReDoS) vulnerability in its dollar-quoted SQL literal lexer. The regex pattern at `sqlparse/keywords.py:33` uses a backreference (`\1`) to match closing dollar-quote delimiters, causing O(n²) CPU complexity when processing inputs containing many unique, unmatched dollar-quote opening sequences. An attacker who can supply arbitrary SQL text to any application using sqlparse can trigger sustained CPU exhaustion, resulting in a denial of service. No authentication or special privileges are required.
+
+**Scope note:** the same regex shape — a lazy dot-all quantifier terminated by a delimiter, applied at every input position by the lexer loop — is also present in the two multiline-comment patterns. Those are covered by this advisory and by the same fix; see "Additional affected pattern: multiline comments" below.
+
+### Details
+
+The vulnerable regex is defined in `sqlparse/keywords.py` as part of `SQL_REGEX`:
+
+```python
+# sqlparse/keywords.py:33
+(r'((?<![\w\"\$])\$(?:[_A-ZÀ-Ü]\w*)?\$)[\s\S]*?\1', tokens.Literal),
+```
+
+This pattern first captures a dollar-quote delimiter (e.g., `$tag$`) into group 1, then attempts to match any characters (`[\s\S]*?`) up to the same delimiter again via backreference `\1`. When no matching closing delimiter exists, the regex engine exhausts the remaining input before concluding there is no match. For a sequence of N unique unmatched openers, each opener triggers a full scan of the remaining string, yielding O(N²) total regex work.
+
+The lexer applies this regex at every character position (`sqlparse/lexer.py:136-138`):
+
+```python
+# sqlparse/lexer.py:136-138
+for pos, char in iterable:
+    for rexmatch, action in self._SQL_REGEX:
+        m = rexmatch(text, pos)
+```
+
+The data flow from public API to the vulnerable sink is:
+
+1. `sqlparse/__init__.py:20` — `parse(sql)` accepts caller-controlled SQL.
+2. `sqlparse/__init__.py:29` — delegates to `parsestream(sql, encoding)`.
+3. `sqlparse/__init__.py:43` — `FilterStack.run(stream, encoding)` is invoked.
+4. `sqlparse/engine/filter_stack.py:31` — `lexer.tokenize(sql, encoding)` is called with no length limit or timeout.
+5. `sqlparse/lexer.py:137` — every regex in `_SQL_REGEX` is tried at the current position.
+6. `sqlparse/keywords.py:33` — the backreference regex performs repeated delimiter searches.
+
+The `MAX_GROUPING_TOKENS = 10000` limit in `sqlparse/engine/grouping.py:20` fires only after lexing completes and does not bound regex CPU time. There is no input length check, delimiter count check, or regex timeout before the sink.
+
+Empirically measured scaling confirms super-linear complexity:
+
+| Input (N unique openers) | Bytes  | Elapsed  |
+|--------------------------|--------|----------|
+| 250                      | 1,889  | 0.066 s  |
+| 500                      | 3,889  | 0.144 s  |
+| 1,000                    | 7,889  | 0.397 s  |
+| 2,000                    | 16,889 | 1.314 s  |
+
+The timing ratio from n=1000 to n=2000 is **3.31×** (input doubled → time tripled), confirming O(n²) growth.
+
+### PoC
+
+**Prerequisites:** Python 3.x with sqlparse installed (tested against version `0.5.6.dev0`, commit `c923da9`).
+
+**Using Docker (isolated reproduction):**
+
+```bash
+# Build from the repository root (parent of vuln-001/)
+docker build -t sqlparse-vuln001 -f vuln-001/Dockerfile .
+
+# Run with no network access
+docker run --rm --network=none sqlparse-vuln001
+```
+
+**Direct Python reproduction:**
+
+```python
+import time
+import sqlparse
+from sqlparse.exceptions import SQLParseError
+
+def make_payload(n: int) -> str:
+    # N unique unmatched dollar-quote openers — none have a matching closing delimiter
+    return " ".join(f"$a{i}$x" for i in range(n))
+
+for n in [250, 500, 1000, 2000]:
+    payload = make_payload(n)
+    t0 = time.perf_counter()
+    try:
+        sqlparse.parse(payload)
+        status = "ok"
+    except SQLParseError as e:
+        status = f"SQLParseError: {e}"
+    elapsed = time.perf_counter() - t0
+    print(f"n={n:>5}  bytes={len(payload):>7}  elapsed={elapsed:.3f}s  status={status}")
+```
+
+**Expected output (super-linear scaling confirms ReDoS):**
+
+```
+n=  250  bytes=   1889  elapsed=0.066s  status=ok
+n=  500  bytes=   3889  elapsed=0.144s  status=ok
+n= 1000  bytes=   7889  elapsed=0.397s  status=ok
+n= 2000  bytes=  16889  elapsed=1.314s  status=ok
+
+Key ratio (n=1000 -> n=2000): 3.31x
+[PASS] Super-linear (O(n^2)) scaling CONFIRMED.
+```
+
+**Attack input structure:**
+
+```
+$a0$x $a1$x $a2$x ... $a{N-1}$x
+```
+
+Each token `$ai$x` resembles a PostgreSQL-style dollar-quote opening tag. Because every tag is unique and no closing tag is present, the regex engine must scan to the end of the string for each opener before backtracking.
+
+**Remediation (proposed patch):**
+
+Replace the backreference regex with a deterministic two-pass approach: first locate all delimiter positions with `re.finditer`, then resolve open/close pairs in O(n) time, eliminating catastrophic backtracking entirely. See `report_excerpt.md` for the full diff.
+
+### Additional affected pattern: multiline comments
+
+Reported independently as GHSA-3crh-2448-7855 (by @7thParkk) and merged into this advisory: it is the same defect class in the same lexer loop, and it is addressed by the same fix.
+
+Two further entries in `SQL_REGEX` use the same lazy dot-all shape, terminated by a literal delimiter instead of a backreference:
+
+```python
+# sqlparse/keywords.py:20
+(r'/\*\+[\s\S]*?\*/', tokens.Comment.Multiline.Hint),
+# sqlparse/keywords.py:23
+(r'/\*[\s\S]*?\*/',    tokens.Comment.Multiline),
+```
+
+A backreference is not required to trigger the quadratic behaviour. The cost comes from the lexer retrying every pattern at every input position (`sqlparse/lexer.py:136-138`): an unterminated `/*` scans to the end of the input and fails, so N unclosed openers cost O(N²).
+
+**PoC**
+
+```python
+import time, sqlparse
+
+for n in (2000, 4000, 8000, 16000):
+    payload = "/*x " * n
+    t0 = time.perf_counter()
+    sqlparse.parse
+
+References:
+- WEB: https://github.com/andialbrecht/sqlparse/security/advisories/GHSA-prg7-hcfm-mfcr
+- WEB: https://github.com/andialbrecht/sqlparse/commit/d1d80602741f77ec78e5a04ce4719244cf32352e
+- PACKAGE: https://github.com/andialbrecht/sqlparse
+
+Fix commit, Python hunks only:
+--- https://github.com/andialbrecht/sqlparse/commit/d1d80602741f77ec78e5a04ce4719244cf32352e.patch ---
+diff --git a/benchmarks/bench_dollar_quote_redos.py b/benchmarks/bench_dollar_quote_redos.py
+index 00000000..234d9c4b
+--- /dev/null
++++ b/benchmarks/bench_dollar_quote_redos.py
+@@ -0,0 +1,90 @@
++"""Delimited-literal lexer benchmark (GHSA-prg7-hcfm-mfcr).
++
++Measures parse time for SQL text containing many unique, unmatched
++opening delimiters for the two lexer constructs that used a lazy dot-all
++regex (`[\\s\\S]*?`) terminated by a backreference or a literal closing
++sequence:
++
++- Dollar-quoted literals, e.g. `$a0$x $a1$x ... $aN$x` (backreference).
++- Multiline comments, e.g. `/* unique0 ... /* unique1 ...` (literal `*/`).
++
++When no closing delimiter is present, a lazy dot-all quantifier applied at
++every text position must scan to the end of the remaining input for every
++opener, which is O(n^2) total work as the number of openers grows.
++
++This benchmark does not assert a pass/fail threshold, since absolute timings
++and scaling ratios depend on the host machine. It exists to make the
++runtime characteristics of these code paths observable and to let it be
++re-run (e.g. after a fix) to confirm that scaling has improved.
++
++Run with:  python benchmarks/bench_dollar_quote_redos.py
++"""
++
++import signal
++import time
++
++import sqlparse
++from sqlparse.engine import grouping
++
++# Disable the grouping-stage DoS guards. They fire only after lexing
++# completes and do not bound regex CPU time, so they would otherwise mask
++# the lexer's true (unbounded) timing behind a SQLParseError at larger n.
++grouping.MAX_GROUPING_DEPTH = None
++grouping.MAX_GROUPING_TOKENS = None
++
++
++def _alarm_handler(signum, frame):
++    raise TimeoutError()
++
++
++signal.signal(signal.SIGALRM, _alarm_handler)
++
++
++def measure(label, sql, fn):
++    signal.alarm(30)
++    t0 = time.perf_counter()
++    status = 'OK'
++    try:
++        fn(sql)
++    except sqlparse.exceptions.SQLParseError:
++        status = 'CAP'
++    except TimeoutError:
++        status = 'TIMEOUT'
++    finally:
++        signal.alarm(0)
++    dt = (time.perf_counter() - t0) * 1000
++    print(f'  {status:8} {dt:8.1f} ms  {label}  ({len(sql)} B)')
++    return dt
++
++
++def make_dollar_quote_payload(n):
++    # N unique, never-closed dollar-quote openers. Each is unique so the
++    # backreference regex cannot short-circuit on an earlier match.
++    return ' '.join(f'$a{i}$x' for i in range(n))
++
++
++def make_comment_payload(n):
++    # N unique, never-closed multiline comment openers. No '*/' appears
++    # anywhere, so the closing literal can never short-circuit the scan.
++    return ' '.join(f'/* unique{i} comment never closed' for i in range(n))
++
++
++def run_scaling(label, make_payload, sizes=(250, 500, 1000, 2000, 4000, 8000)):
++    print(f'{label}:')
++    timings = {}
++    for n in sizes:
++        sql = make_payload(n)
++        timings[n] = measure(f'{label} n={n}', sql, sqlparse.parse)
++
++    print()
++    print('Scaling ratios (O(n^2) implies ~4x time per 2x input):')
++    for prev, curr in zip(sizes, sizes[1:]):
++        if timings[prev] > 0:
++            ratio = timings[curr] / timings[prev]
++            print(f'  n={prev} -> n={curr} (input x{curr / prev:.1f}): '
++                  f'time ratio = {ratio:.2f}x')
++    print()
++
++
++run_scaling('Unmatched dollar-quote openers', make_dollar_quote_payload)
++run_scaling('Unclosed multiline comments', make_comment_payload)
+diff --git a/sqlparse/keywords.py b/sqlparse/keywords.py
+index d12cc226..19fcf789 100644
+--- a/sqlparse/keywords.py
++++ b/sqlparse/keywords.py
+@@ -5,7 +5,10 @@
+ # This module is part of python-sqlparse and is released under
+ # the BSD License: https://opensource.org/licenses/BSD-3-Clause
+ 
++import re
++
+ from sqlparse import tokens
++from sqlparse.utils import _DelimiterOccurrence, resolve_paired_delimiters
+ 
+ # object() only supports "is" and is useful as a marker
+ # use this marker to specify that the given regex in SQL_REGEX
+@@ -13,12 +16,64 @@
+ PROCESS_AS_KEYWORD = object()
+ 
+ 
++# Dollar-quoted literals (`$tag$...$tag$`) and multiline comments
++# (`/*...*/`, `/*+...*/`) used to be matched with per-position regexes
++# using a lazy dot-all quantifier (`[\s\S]*?`) terminated by a
++# backreference or a literal delimiter. Applied at every text position by
++# the lexer loop below, that shape is O(n^2) on adversarial input with
++# many unclosed openers, since each failed attempt re-scans to the end of
++# the remaining text (GHSA-prg7-hcfm-mfcr). They are resolved instead in
++# a single linear pass by find_delimited_spans().
++_DOLLAR_QUOTE_DELIM = re.compile(r'\$(?:[_A-ZÀ-Ü]\w*)?\$', re.IGNORECASE | re.UNICODE)
++_DOLLAR_QUOTE_OPENER_OK = re.compile(r'(?<![\w"$])', re.UNICODE)
++_COMMENT_HINT_OPEN = re.compile(r'/\*\+')
++_COMMENT_OPEN = re.compile(r'/\*(?!\+)')
++_COMMENT_CLOSE = re.compile(r'\*/')
++
++
++def find_delimited_spans(text):
++    """Locate dollar-quoted literals and multiline comments in `text`.
++
++    Returns a dict mapping each span's start offset to
++    (end offset, token type).
++    """
++    has_dollar = '$' in text
++    # A comment can only ever open on "/*"; without it "*/" alone can
++    # never pair with anything, so gating on "/*" alone is sufficient to
++    # skip all three comment-related regex passes below.
++    has_comment_open = '/*' in text
++    if not has_dollar and not has_comment_open:
++        return {}
++
++    occurrences = []
++    if has_dollar:
++        for m in _DOLLAR_QUOTE_DELIM.finditer(text):
++            tag = m.group()
++            can_open = _DOLLAR_QUOTE_OPENER_OK.match(text, m.start()) is not None
++            occurrences.append(
++                _DelimiterOccurrence(m.start(), m.end(), tag, can_open, True, tokens.Literal))
++    if has_comment_open:
++        for m in _COMMENT_HINT_OPEN.finditer(text):
++            occurrences.append(_DelimiterOccurrence(
++                m.start(), m.end(), 'C', True, False,
++                tokens.Comment.Multiline.Hint))
++        for m in _COMMENT_OPEN.finditer(text):
++            occurrences.append(_DelimiterOccurrence(
++                m.start(), m.end(), 'C', True, False,
++                tokens.Comment.Multiline))
++        for m in _COMMENT_CLOSE.finditer(text):
++            occurrences.append(
++                _DelimiterOccurrence(m.start(), m.end(), 'C', False, True, None))
++    occurrences.sort(key=lambda occ: occ.start)
++
++    spans = resolve_paired_delimiters(occurrences)
++    return {start: (end, ttype) for start, end, ttype in spans}
++
++
+ SQL_REGEX = [
+     (r'(--|# )\+.*?(\r\n|\r|\n|$)', tokens.Comment.Single.Hint),
+-    (r'/\*\+[\s\S]*?\*/', tokens.Comment.Multiline.Hint),
+ 
+     (r'(--|# ).*?(\r\n|\r|\n|$)', tokens.Comment.Single),
+-    (r'/\*[\s\S]*?\*/', tokens.Comment.Multiline),
+ 
+     (r'(\r\n|\r|\n)', tokens.Newline),
+     (r'\s+?', tokens.Whitespace),
+@@ -30,7 +85,6 @@
+ 
+     (r"`(``|[^`])*`", tokens.Name),
+     (r"´(´´|[^´])*´", tokens.Name),
+-    (r'((?<![\w\"\$])\$(?:[_A-ZÀ-Ü]\w*)?\$)[\s\S]*?\1', tokens.Literal),
+ 
+     (r'\?', tokens.Name.Placeholder),
+     (r'%(\(\w+\))?s', tokens.Name.Placeholder),
+diff --git a/sqlparse/lexer.py b/sqlparse/lexer.py
+index 966cdb2c..cadcd778 100644
+--- a/sqlparse/lexer.py
++++ b/sqlparse/lexer.py
+@@ -132,8 +132,16 @@ def get_tokens(self, text, encoding=None):
+         else:
+             raise TypeError(f"Expected text or file-like object, got {type(text)!r}")
+ 
++        delimited_spans = keywords.find_delimited_spans(text)
++
+         iterable = enumerate(text)
+         for pos, char in iterable:
++            if pos in delimited_spans:
++                end, ttype = delimited_spans[pos]
++                yield ttype, text[pos:end]
++                consume(iterable, end - pos - 1)
++                continue
++
+             for rexmatch, action in self._SQL_REGEX:
+                 m = rexmatch(text, pos)
+ 
+diff --git a/sqlparse/utils.py b/sqlparse/utils.py
+index 58c0245a..ed837342 100644
+--- a/sqlparse/utils.py
++++ b/sqlparse/utils.py
+@@ -7,7 +7,7 @@
+ 
+ import itertools
+ import re
+-from collections import deque
++from collections import defaultdict, deque, namedtuple
+ from contextlib import contextmanager
+ 
+ # This regular expression replaces the home-cooked parser that was here before.
+@@ -110,6 +110,50 @@ def consume(iterator, n):
+     deque(itertools.islice(iterator, n), maxlen=0)
+ 
+ 
++_DelimiterOccurrence = namedtuple(
++    '_DelimiterOccurrence', 'start end tag can_open can_close payload')
++
++
++def resolve_paired_delimiters(occurrences):
++    """Pair delimiter occurrences (quote/comment open & close markers) in
++    one left-to-right pass, instead of re-scanning the remaining text for
++    every unmatched opener -- which is what a backreference- or literal-
++    terminated lazy-dot-all regex applied at every text position ends up
++    doing, and is O(n^2) on adversarial input (GHSA-prg7-hcfm-mfcr).
++
++    `occurrences` must be sorted by `start`. Each occurrence with
++    `can_open` is paired with the nearest later occurrence sharing its
++    `tag` that has `can_close`; anything in between (including other
++    openers) is left as literal content. Unpaired openers are dropped,
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-prg7-hcfm-mfcr", "package": "sqlparse", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

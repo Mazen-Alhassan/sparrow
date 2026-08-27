@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-f2ff-p2ww-7p4p",
+  "package": "sqlparse",
+  "sinks": [
+    "sqlparse.engine.grouping.group_comments"
+  ],
+  "confidence": "high",
+  "evidence": "the advisory names sqlparse/engine/grouping.py group_comments as the quadratic loop and the fix commit adds a regression benchmark for it",
+  "assumptions": [
+    "the Python hunks shown are the benchmark script, so the change to group_comments itself was inferred from the advisory text"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "sqlparse.engine.grouping.group_comments": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "0.4.4",
+      "fixed_version": "0.6.0",
+      "note": "body differs between 0.4.4 and 0.6.0",
+      "location": "sqlparse.engine.grouping:group_comments"
+    }
+  }
+}

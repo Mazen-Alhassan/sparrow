@@ -1,0 +1,13 @@
+{
+  "advisory": "PYSEC-2025-183",
+  "package": "pyjwt",
+  "sinks": [],
+  "confidence": "medium",
+  "evidence": "the advisory is disputed by the maintainer and describes key length chosen by the application, not a flaw in a PyJWT function",
+  "assumptions": [
+    "assumes a disputed advisory with no fix has no sink",
+    "if a minimum key length check were added it would live in jwt.algorithms.HMACAlgorithm.prepare_key"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

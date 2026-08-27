@@ -1,0 +1,24 @@
+{
+  "advisory": "GHSA-29vq-49wr-vm6x",
+  "package": "werkzeug",
+  "sinks": [
+    "werkzeug.security.safe_join"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit f407712 rewrites safe_join in src/werkzeug/security.py to check every path segment for Windows device names",
+  "assumptions": [
+    "assumes the flaw is in safe_join itself and not in send_from_directory, which is the caller the advisory describes"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "werkzeug.security.safe_join": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "2.3.3",
+      "fixed_version": "3.1.6",
+      "note": "body differs between 2.3.3 and 3.1.6",
+      "location": "werkzeug.security:safe_join"
+    }
+  }
+}

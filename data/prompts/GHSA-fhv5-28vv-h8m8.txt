@@ -1,0 +1,58 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-fhv5-28vv-h8m8 (CVE-2026-48524, GHSA-fhv5-28vv-h8m8, PYSEC-2026-177)
+Package: pyjwt 2.4.0
+Fixed in: 2.13.0
+Severity: low
+
+Summary: PyJWKClient unbounded JWKS endpoint requests via attacker-controlled kid values (DoS)
+
+Details:
+> [!NOTE]
+>  The vulnerability surfaces only when a JWKS fetch fails; an attacker can attempt to provoke that with sustained unknown-kid traffic, but the outcome depends on upstream JWKS-endpoint behavior (rate limiting, transient errors) which is beyond the attacker's control. Impact is reduced auth availability until the next successful fetch, not complete denial of service.
+
+## Summary
+PyJWKClient.get_signing_key() forces a fresh HTTP request to the JWKS endpoint for every JWT with an unknown kid value, with no rate limiting. Since kid comes from the unverified token header, an attacker can trigger unlimited outbound requests.
+
+Additionally, fetch_data() finally block clears the JWKS cache on network error.
+
+## Root Cause
+jwt/jwks_client.py:172-198 - get_signing_key(kid) calls get_signing_keys(refresh=True) for unknown kids, bypassing TTL cache with no cooldown.
+jwt/jwks_client.py:120-122 - finally block writes None to cache on error, clearing valid data.
+
+## Impact
+- DoS against JWKS endpoint (unlimited requests per invalid token)
+- DoS against application (network I/O latency)
+- Cascading failure (rate limiting clears cache, breaking legitimate auth)
+
+## Suggested Fix
+1. Add refresh cooldown (refuse refresh more than once per TTL period)
+2. Move cache write from finally to else block
+
+## Affected Versions
+All versions with PyJWKClient (2.4.0 through 2.12.1)
+
+References:
+- WEB: https://github.com/jpadilla/pyjwt/security/advisories/GHSA-fhv5-28vv-h8m8
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-48524
+- WEB: https://github.com/github/advisory-database/pull/8522
+- PACKAGE: https://github.com/jpadilla/pyjwt
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/pyjwt/PYSEC-2026-177.yaml
+
+(no fix commit is linked from this advisory)
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-fhv5-28vv-h8m8", "package": "pyjwt", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

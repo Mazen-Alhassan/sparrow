@@ -1,0 +1,272 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-v845-jxx5-vc9f (CVE-2023-43804, GHSA-v845-jxx5-vc9f, PYSEC-2023-192)
+Package: urllib3 1.26.6
+Fixed in: 1.26.17, 2.0.6
+Severity: high
+
+Summary: `Cookie` HTTP header isn't stripped on cross-origin redirects
+
+Details:
+urllib3 doesn't treat the `Cookie` HTTP header special or provide any helpers for managing cookies over HTTP, that is the responsibility of the user. However, it is possible for a user to specify a `Cookie` header and unknowingly leak information via HTTP redirects to a different origin if that user doesn't disable redirects explicitly.
+
+Users **must** handle redirects themselves instead of relying on urllib3's automatic redirects to achieve safe processing of the `Cookie` header, thus we decided to strip the header by default in order to further protect users who aren't using the correct approach.
+
+## Affected usages
+
+We believe the number of usages affected by this advisory is low. It requires all of the following to be true to be exploited:
+
+* Using an affected version of urllib3 (patched in v1.26.17 and v2.0.6)
+* Using the `Cookie` header on requests, which is mostly typical for impersonating a browser.
+* Not disabling HTTP redirects
+* Either not using HTTPS or for the origin server to redirect to a malicious origin.
+
+## Remediation
+
+* Upgrading to at least urllib3 v1.26.17 or v2.0.6
+* Disabling HTTP redirects using `redirects=False` when sending requests.
+* Not using the `Cookie` header.
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-v845-jxx5-vc9f
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2023-43804
+- WEB: https://github.com/urllib3/urllib3/commit/01220354d389cd05474713f8c982d05c9b17aafb
+- WEB: https://github.com/urllib3/urllib3/commit/644124ecd0b6e417c527191f866daa05a5a2056d
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/urllib3/PYSEC-2023-192.yaml
+- PACKAGE: https://github.com/urllib3/urllib3
+- WEB: https://lists.debian.org/debian-lts-announce/2023/10/msg00012.html
+- WEB: https://lists.debian.org/debian-lts-announce/2024/12/msg00020.html
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/5F5CUBAN5XMEBVBZPHFITBLMJV5FIJJ5
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/I3PR7C6RJ6JUBQKIJ644DMIJSUP36VDY
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/NDAGZXYJ7H2G3SB47M453VQVNAWKAEJJ
+- WEB: https://security.netapp.com/advisory/ntap-20241213-0007
+
+Fix commit, Python hunks only:
+--- https://github.com/urllib3/urllib3/commit/01220354d389cd05474713f8c982d05c9b17aafb.patch ---
+diff --git a/src/urllib3/util/retry.py b/src/urllib3/util/retry.py
+index 2490d5e5b6..60ef6c4f3f 100644
+--- a/src/urllib3/util/retry.py
++++ b/src/urllib3/util/retry.py
+@@ -235,7 +235,7 @@ class Retry(object):
+     RETRY_AFTER_STATUS_CODES = frozenset([413, 429, 503])
+ 
+     #: Default headers to be used for ``remove_headers_on_redirect``
+-    DEFAULT_REMOVE_HEADERS_ON_REDIRECT = frozenset(["Authorization"])
++    DEFAULT_REMOVE_HEADERS_ON_REDIRECT = frozenset(["Cookie", "Authorization"])
+ 
+     #: Maximum backoff time.
+     DEFAULT_BACKOFF_MAX = 120
+diff --git a/test/test_retry.py b/test/test_retry.py
+index 21ba1e92e1..95a33e7461 100644
+--- a/test/test_retry.py
++++ b/test/test_retry.py
+@@ -293,12 +293,12 @@ def test_retry_method_not_in_whitelist(self):
+     def test_retry_default_remove_headers_on_redirect(self):
+         retry = Retry()
+ 
+-        assert list(retry.remove_headers_on_redirect) == ["authorization"]
++        assert retry.remove_headers_on_redirect == {"authorization", "cookie"}
+ 
+     def test_retry_set_remove_headers_on_redirect(self):
+         retry = Retry(remove_headers_on_redirect=["X-API-Secret"])
+ 
+-        assert list(retry.remove_headers_on_redirect) == ["x-api-secret"]
++        assert retry.remove_headers_on_redirect == {"x-api-secret"}
+ 
+     @pytest.mark.parametrize("value", ["-1", "+1", "1.0", six.u("\xb2")])  # \xb2 = ^2
+     def test_parse_retry_after_invalid(self, value):
+diff --git a/test/test_retry_deprecated.py b/test/test_retry_deprecated.py
+index f55c5d846b..5133a51afa 100644
+--- a/test/test_retry_deprecated.py
++++ b/test/test_retry_deprecated.py
+@@ -295,7 +295,7 @@ def test_retry_method_not_in_whitelist(self):
+     def test_retry_default_remove_headers_on_redirect(self):
+         retry = Retry()
+ 
+-        assert list(retry.remove_headers_on_redirect) == ["authorization"]
++        assert retry.remove_headers_on_redirect == {"authorization", "cookie"}
+ 
+     def test_retry_set_remove_headers_on_redirect(self):
+         retry = Retry(remove_headers_on_redirect=["X-API-Secret"])
+diff --git a/test/with_dummyserver/test_poolmanager.py b/test/with_dummyserver/test_poolmanager.py
+index fa07a372a9..02a38115c5 100644
+--- a/test/with_dummyserver/test_poolmanager.py
++++ b/test/with_dummyserver/test_poolmanager.py
+@@ -141,7 +141,7 @@ def test_redirect_cross_host_remove_headers(self):
+                 "GET",
+                 "%s/redirect" % self.base_url,
+                 fields={"target": "%s/headers" % self.base_url_alt},
+-                headers={"Authorization": "foo"},
++                headers={"Authorization": "foo", "Cookie": "foo=bar"},
+             )
+ 
+             assert r.status == 200
+@@ -149,12 +149,13 @@ def test_redirect_cross_host_remove_headers(self):
+             data = json.loads(r.data.decode("utf-8"))
+ 
+             assert "Authorization" not in data
++            assert "Cookie" not in data
+ 
+             r = http.request(
+                 "GET",
+                 "%s/redirect" % self.base_url,
+                 fields={"target": "%s/headers" % self.base_url_alt},
+-                headers={"authorization": "foo"},
++                headers={"authorization": "foo", "cookie": "foo=bar"},
+             )
+ 
+             assert r.status == 200
+@@ -163,6 +164,8 @@ def test_redirect_cross_host_remove_headers(self):
+ 
+             assert "authorization" not in data
+             assert "Authorization" not in data
++            assert "cookie" not in data
++            assert "Cookie" not in data
+ 
+     def test_redirect_cross_host_no_remove_headers(self):
+         with PoolManager() as http:
+@@ -170,7 +173,7 @@ def test_redirect_cross_host_no_remove_headers(self):
+                 "GET",
+                 "%s/redirect" % self.base_url,
+                 fields={"target": "%s/headers" % self.base_url_alt},
+-                headers={"Authorization": "foo"},
++                headers={"Authorization": "foo", "Cookie": "foo=bar"},
+                 retries=Retry(remove_headers_on_redirect=[]),
+             )
+ 
+@@ -179,6 +182,7 @@ def test_redirect_cross_host_no_remove_headers(self):
+             data = json.loads(r.data.decode("utf-8"))
+ 
+             assert data["Authorization"] == "foo"
++            assert data["Cookie"] == "foo=bar"
+ 
+     def test_redirect_cross_host_set_removed_headers(self):
+         with PoolManager() as http:
+@@ -186,7 +190,11 @@ def test_redirect_cross_host_set_removed_headers(self):
+                 "GET",
+                 "%s/redirect" % self.base_url,
+                 fields={"target": "%s/headers" % self.base_url_alt},
+-                headers={"X-API-Secret": "foo", "Authorization": "bar"},
++                headers={
++                    "X-API-Secret": "foo",
++                    "Authorization": "bar",
++                    "Cookie": "foo=bar",
++                },
+                 retries=Retry(remove_headers_on_redirect=["X-API-Secret"]),
+             )
+ 
+@@ -196,12 +204,17 @@ def test_redirect_cross_host_set_removed_headers(self):
+ 
+             assert "X-API-Secret" not in data
+             assert data["Authorization"] == "bar"
++            assert data["Cookie"] == "foo=bar"
+ 
+             r = http.request(
+                 "GET",
+                 "%s/redirect" % self.base_url,
+                 fields={"target": "%s/headers" % self.base_url_alt},
+-                headers={"x-api-secret": "foo", "authorization": "bar"},
++                headers={
++                    "x-api-secret": "foo",
++                    "authorization": "bar",
++                    "cookie": "foo=bar",
++                },
+                 retries=Retry(remove_headers_on_redirect=["X-API-Secret"]),
+             )
+ 
+@@ -212,6 +225,7 @@ def test_redirect_cross_host_set_removed_headers(self):
+             assert "x-api-secret" not in data
+             assert "X-API-Secret" not in data
+             assert data["Authorization"] == "bar"
++            assert data["Cookie"] == "foo=bar"
+ 
+     def test_redirect_without_preload_releases_connection(self):
+         with PoolManager(block=True, maxsize=2) as http:
+
+--- https://github.com/urllib3/urllib3/commit/644124ecd0b6e417c527191f866daa05a5a2056d.patch ---
+diff --git a/src/urllib3/util/retry.py b/src/urllib3/util/retry.py
+index ea48afe3ca..7572bfd26a 100644
+--- a/src/urllib3/util/retry.py
++++ b/src/urllib3/util/retry.py
+@@ -187,7 +187,7 @@ class Retry:
+     RETRY_AFTER_STATUS_CODES = frozenset([413, 429, 503])
+ 
+     #: Default headers to be used for ``remove_headers_on_redirect``
+-    DEFAULT_REMOVE_HEADERS_ON_REDIRECT = frozenset(["Authorization"])
++    DEFAULT_REMOVE_HEADERS_ON_REDIRECT = frozenset(["Cookie", "Authorization"])
+ 
+     #: Default maximum backoff time.
+     DEFAULT_BACKOFF_MAX = 120
+diff --git a/test/test_retry.py b/test/test_retry.py
+index 4fb2bba14c..f71e7acc9e 100644
+--- a/test/test_retry.py
++++ b/test/test_retry.py
+@@ -334,12 +334,12 @@ def test_retry_method_not_allowed(self) -> None:
+     def test_retry_default_remove_headers_on_redirect(self) -> None:
+         retry = Retry()
+ 
+-        assert list(retry.remove_headers_on_redirect) == ["authorization"]
++        assert retry.remove_headers_on_redirect == {"authorization", "cookie"}
+ 
+     def test_retry_set_remove_headers_on_redirect(self) -> None:
+         retry = Retry(remove_headers_on_redirect=["X-API-Secret"])
+ 
+-        assert list(retry.remove_headers_on_redirect) == ["x-api-secret"]
++        assert retry.remove_headers_on_redirect == {"x-api-secret"}
+ 
+     @pytest.mark.parametrize("value", ["-1", "+1", "1.0", "\xb2"])  # \xb2 = ^2
+     def test_parse_retry_after_invalid(self, value: str) -> None:
+diff --git a/test/with_dummyserver/test_poolmanager.py b/test/with_dummyserver/test_poolmanager.py
+index e4c550714c..da802a38b3 100644
+--- a/test/with_dummyserver/test_poolmanager.py
++++ b/test/with_dummyserver/test_poolmanager.py
+@@ -141,7 +141,7 @@ def test_redirect_cross_host_remove_headers(self) -> None:
+                 "GET",
+                 f"{self.base_url}/redirect",
+                 fields={"target": f"{self.base_url_alt}/headers"},
+-                headers={"Authorization": "foo"},
++                headers={"Authorization": "foo", "Cookie": "foo=bar"},
+             )
+ 
+             assert r.status == 200
+@@ -149,12 +149,13 @@ def test_redirect_cross_host_remove_headers(self) -> None:
+             data = r.json()
+ 
+             assert "Authorization" not in data
++            assert "Cookie" not in data
+ 
+             r = http.request(
+                 "GET",
+                 f"{self.base_url}/redirect",
+                 fields={"target": f"{self.base_url_alt}/headers"},
+-                headers={"authorization": "foo"},
++                headers={"authorization": "foo", "cookie": "foo=bar"},
+             )
+ 
+             assert r.status == 200
+@@ -163,6 +164,8 @@ def test_redirect_cross_host_remove_headers(self) -> None:
+ 
+             assert "authorization" not in data
+             assert "Authorization" not in data
++            assert "cookie" not in data
++            assert "Cookie" not in data
+ 
+     def test_redirect_cross_host_no_remove_headers(self) -> None:
+         with PoolManager() as http:
+... diff truncated ...
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-v845-jxx5-vc9f", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

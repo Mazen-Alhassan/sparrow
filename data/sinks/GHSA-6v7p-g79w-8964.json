@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-6v7p-g79w-8964",
+  "package": "msgpack",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "the linked commit touches only Cython and C sources plus tests, so the Python-only diff filter leaves nothing to name",
+  "assumptions": [
+    "assumes the flaw is in the compiled _cmsgpack unpacker, which no Python sink can represent",
+    "msgpack.fallback.Unpacker may carry the same reuse-after-error bug and was not named because the diff does not show it"
+  ],
+  "mode": "advisory+patch",
+  "verification": {}
+}

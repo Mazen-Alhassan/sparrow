@@ -1,0 +1,133 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-fw5r-6m3x-rh7p (CVE-2024-45314, GHSA-fw5r-6m3x-rh7p, PYSEC-2026-1382)
+Package: flask-appbuilder 4.3.10
+Fixed in: 4.5.1
+Severity: moderate
+
+Summary: Flask-AppBuilder's login form allows browser to cache sensitive fields 
+
+Details:
+### Impact
+Auth DB login form default cache directives allows browser to locally store sensitive data. This can be an issue on environments using shared computer resources.
+
+### Patches
+Upgrade flask-appbuilder to version 4.5.1
+
+### Workarounds
+If upgrading is not possible configure your web server to send the following HTTP headers for /login:
+"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+"Pragma": "no-cache"
+"Expires": "0" 
+
+
+References:
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/security/advisories/GHSA-fw5r-6m3x-rh7p
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-45314
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/commit/3030e881d2e44f4021764e18e489fe940a9b3636
+- PACKAGE: https://github.com/dpgaspar/Flask-AppBuilder
+
+Fix commit, Python hunks only:
+--- https://github.com/dpgaspar/Flask-AppBuilder/commit/3030e881d2e44f4021764e18e489fe940a9b3636.patch ---
+diff --git a/flask_appbuilder/security/decorators.py b/flask_appbuilder/security/decorators.py
+index 740580b08c..46287e7235 100644
+--- a/flask_appbuilder/security/decorators.py
++++ b/flask_appbuilder/security/decorators.py
+@@ -30,6 +30,20 @@
+ P = ParamSpec("P")
+ 
+ 
++def no_cache(view: Callable[..., Response]) -> Callable[..., Response]:
++    @functools.wraps(view)
++    def wrapped_view(*args, **kwargs) -> Response:
++        response = make_response(view(*args, **kwargs))
++        response.headers[
++            "Cache-Control"
++        ] = "no-store, no-cache, must-revalidate, max-age=0"
++        response.headers["Pragma"] = "no-cache"
++        response.headers["Expires"] = "0"
++        return response
++
++    return wrapped_view
++
++
+ def response_unauthorized_mvc(status_code: int) -> Response:
+     response = make_response(
+         jsonify({"message": str(FLAMSG_ERR_SEC_ACCESS_DENIED), "severity": "danger"}),
+diff --git a/flask_appbuilder/security/views.py b/flask_appbuilder/security/views.py
+index 86fa1021fe..ddc1d0b5e8 100644
+--- a/flask_appbuilder/security/views.py
++++ b/flask_appbuilder/security/views.py
+@@ -9,7 +9,7 @@
+ from flask_appbuilder.baseviews import BaseView
+ from flask_appbuilder.charts.views import DirectByChartView
+ from flask_appbuilder.fieldwidgets import BS3PasswordFieldWidget
+-from flask_appbuilder.security.decorators import has_access
++from flask_appbuilder.security.decorators import has_access, no_cache
+ from flask_appbuilder.security.forms import (
+     DynamicForm,
+     LoginForm_db,
+@@ -520,6 +520,7 @@ class AuthDBView(AuthView):
+     login_template = "appbuilder/general/security/login_db.html"
+ 
+     @expose("/login/", methods=["GET", "POST"])
++    @no_cache
+     def login(self):
+         if g.user is not None and g.user.is_authenticated:
+             return redirect(self.appbuilder.get_url_for_index)
+@@ -543,6 +544,7 @@ class AuthLDAPView(AuthView):
+     login_template = "appbuilder/general/security/login_ldap.html"
+ 
+     @expose("/login/", methods=["GET", "POST"])
++    @no_cache
+     def login(self):
+         if g.user is not None and g.user.is_authenticated:
+             return redirect(self.appbuilder.get_url_for_index)
+@@ -568,6 +570,7 @@ class AuthOIDView(AuthView):
+     oid_ask_for_optional: List[str] = []
+ 
+     @expose("/login/", methods=["GET", "POST"])
++    @no_cache
+     def login(self, flag=True) -> WerkzeugResponse:
+         @self.appbuilder.sm.oid.loginhandler
+         def login_handler(self):
+diff --git a/tests/security/test_mvc_security.py b/tests/security/test_mvc_security.py
+index d7adea63fc..bb022fc911 100644
+--- a/tests/security/test_mvc_security.py
++++ b/tests/security/test_mvc_security.py
+@@ -63,6 +63,19 @@ class Model1View(ModelView):
+ 
+         self.appbuilder.add_view(Model1View, "Model1", category="Model1")
+ 
++    def test_sec_login_no_cache(self):
++        """
++        Test Security Login, no cache directives
++        """
++        rv = self.client.get("/login/")
++        assert rv.status_code == 200
++        assert (
++            rv.headers.get("Cache-Control")
++            == "no-store, no-cache, must-revalidate, max-age=0"
++        )
++        assert rv.headers["Pragma"] == "no-cache"
++        assert rv.headers["Expires"] == "0"
++
+     def test_sec_login(self):
+         """
+         Test Security Login, Logout, invalid login, invalid access
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-fw5r-6m3x-rh7p", "package": "flask-appbuilder", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

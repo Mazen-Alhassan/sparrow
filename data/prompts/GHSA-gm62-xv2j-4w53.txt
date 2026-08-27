@@ -1,0 +1,97 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-gm62-xv2j-4w53 (CVE-2025-66418, GHSA-gm62-xv2j-4w53, PYSEC-2026-1998)
+Package: urllib3 1.26.6
+Fixed in: 2.6.0
+Severity: high
+
+Summary: urllib3 allows an unbounded number of links in the decompression chain
+
+Details:
+## Impact
+
+urllib3 supports chained HTTP encoding algorithms for response content according to RFC 9110 (e.g., `Content-Encoding: gzip, zstd`).
+
+However, the number of links in the decompression chain was unbounded allowing a malicious server to insert a virtually unlimited number of compression steps leading to high CPU usage and massive memory allocation for the decompressed data.
+
+
+## Affected usages
+
+Applications and libraries using urllib3 version 2.5.0 and earlier for HTTP requests to untrusted sources unless they disable content decoding explicitly.
+
+
+## Remediation
+
+Upgrade to at least urllib3 v2.6.0 in which the library limits the number of links to 5.
+
+If upgrading is not immediately possible, use [`preload_content=False`](https://urllib3.readthedocs.io/en/2.5.0/advanced-usage.html#streaming-and-i-o) and ensure that `resp.headers["content-encoding"]` contains a safe number of encodings before reading the response content.
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-gm62-xv2j-4w53
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-66418
+- WEB: https://github.com/urllib3/urllib3/commit/24d7b67eac89f94e11003424bcf0d8f7b72222a8
+- PACKAGE: https://github.com/urllib3/urllib3
+
+Fix commit, Python hunks only:
+--- https://github.com/urllib3/urllib3/commit/24d7b67eac89f94e11003424bcf0d8f7b72222a8.patch ---
+diff --git a/src/urllib3/response.py b/src/urllib3/response.py
+index 4ba421369f..069f726cb8 100644
+--- a/src/urllib3/response.py
++++ b/src/urllib3/response.py
+@@ -306,8 +306,18 @@ class MultiDecoder(ContentDecoder):
+         they were applied.
+     """
+ 
++    # Maximum allowed number of chained HTTP encodings in the
++    # Content-Encoding header.
++    max_decode_links = 5
++
+     def __init__(self, modes: str) -> None:
+-        self._decoders = [_get_decoder(m.strip()) for m in modes.split(",")]
++        encodings = [m.strip() for m in modes.split(",")]
++        if len(encodings) > self.max_decode_links:
++            raise DecodeError(
++                "Too many content encodings in the chain: "
++                f"{len(encodings)} > {self.max_decode_links}"
++            )
++        self._decoders = [_get_decoder(e) for e in encodings]
+ 
+     def flush(self) -> bytes:
+         return self._decoders[0].flush()
+diff --git a/test/test_response.py b/test/test_response.py
+index 9592fdd940..d824ae70b4 100644
+--- a/test/test_response.py
++++ b/test/test_response.py
+@@ -847,6 +847,16 @@ def test_read_multi_decoding_deflate_deflate(self) -> None:
+         assert r.read(9 * 37) == b"foobarbaz" * 37
+         assert r.read() == b""
+ 
++    def test_read_multi_decoding_too_many_links(self) -> None:
++        fp = BytesIO(b"foo")
++        with pytest.raises(
++            DecodeError, match="Too many content encodings in the chain: 6 > 5"
++        ):
++            HTTPResponse(
++                fp,
++                headers={"content-encoding": "gzip, deflate, br, zstd, gzip, deflate"},
++            )
++
+     def test_body_blob(self) -> None:
+         resp = HTTPResponse(b"foo")
+         assert resp.data == b"foo"
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-gm62-xv2j-4w53", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

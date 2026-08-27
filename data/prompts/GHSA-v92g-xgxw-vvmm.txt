@@ -1,0 +1,125 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory+patch
+You get the advisory text and the Python hunks of the linked fix commit below.
+
+Advisory GHSA-v92g-xgxw-vvmm (CVE-2026-41205, GHSA-v92g-xgxw-vvmm, PYSEC-2026-88)
+Package: mako 1.2.4
+Fixed in: 1.3.11
+Severity: high
+
+Summary: Mako: Path traversal via double-slash URI prefix in TemplateLookup
+
+Details:
+### Summary
+
+`TemplateLookup.get_template()` is vulnerable to path traversal when a URI starts with `//` (e.g., `//../../../secret.txt`). The root cause is an inconsistency between two slash-stripping implementations:
+
+- `Template.__init__` strips **one** leading `/` using `if`/slice
+- `TemplateLookup.get_template()` strips **all** leading `/` using `re.sub(r"^\/+", "")`
+
+When a URI like `//../../../../etc/passwd` is passed:
+1. `get_template()` strips all `/` → `../../../../etc/passwd` → file found via `posixpath.join(dir_, u)`
+2. `Template.__init__` strips one `/` → `/../../../../etc/passwd` → `normpath` → `/etc/passwd`
+3. `/etc/passwd`.startswith(`..`) → `False` → **check bypassed**
+
+### Impact
+
+Arbitrary file read: any file readable by the process can be returned as rendered template content when an application passes untrusted input directly to `TemplateLookup.get_template()`.
+
+Note: this is exploitable at the library API level. HTTP-based exploitation is mitigated by Python's `BaseHTTPRequestHandler` which normalizes double-slash prefixes since CPython gh-87389. Applications using other HTTP servers that do not normalize paths may be affected.
+
+### Fix
+
+Changed `Template.__init__` to use `lstrip("/")` instead of stripping only a single leading slash, so both code paths handle leading slashes consistently.
+
+References:
+- WEB: https://github.com/sqlalchemy/mako/security/advisories/GHSA-v92g-xgxw-vvmm
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-41205
+- WEB: https://github.com/sqlalchemy/mako/commit/e05ac61989a7fb9dd7dcde6cfd72dc48328719a3
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/mako/PYSEC-2026-88.yaml
+- PACKAGE: https://github.com/sqlalchemy/mako
+- WEB: https://github.com/sqlalchemy/mako/releases/tag/rel_1_3_11
+
+Fix commit, Python hunks only:
+--- https://github.com/sqlalchemy/mako/commit/e05ac61989a7fb9dd7dcde6cfd72dc48328719a3.patch ---
+diff --git a/mako/template.py b/mako/template.py
+index 82c7cba8..d8ebc949 100644
+--- a/mako/template.py
++++ b/mako/template.py
+@@ -259,9 +259,7 @@ def __init__(
+             self.module_id = "memory:" + hex(id(self))
+             self.uri = self.module_id
+ 
+-        u_norm = self.uri
+-        if u_norm.startswith("/"):
+-            u_norm = u_norm[1:]
++        u_norm = self.uri.lstrip("/")
+         u_norm = os.path.normpath(u_norm)
+         if u_norm.startswith(".."):
+             raise exceptions.TemplateLookupException(
+diff --git a/test/test_lookup.py b/test/test_lookup.py
+index 6a797d7a..2f7cdf0b 100644
+--- a/test/test_lookup.py
++++ b/test/test_lookup.py
+@@ -127,6 +127,47 @@ def test_dont_accept_relative_outside_of_root(self):
+         # this is OK since the .. cancels out
+         runtime._lookup_template(ctx, "foo/../index.html", index.uri)
+ 
++    def test_dont_accept_relative_outside_of_root_via_double_slash(self):
++        """test that double-slash URI prefix can't bypass the
++        path traversal check"""
++        with tempfile.TemporaryDirectory() as base:
++            tmpl_dir = os.path.join(base, "app", "templates")
++            os.makedirs(tmpl_dir)
++            with open(os.path.join(tmpl_dir, "index.html"), "w") as f:
++                f.write("Hello")
++
++            secret = os.path.join(base, "secrets", "creds.txt")
++            os.makedirs(os.path.dirname(secret))
++            with open(secret, "w") as f:
++                f.write("SECRET_KEY=supersecret123")
++
++            tl = lookup.TemplateLookup(directories=[tmpl_dir])
++            rel = os.path.relpath(secret, tmpl_dir)
++
++            # single-slash prefix should also be blocked
++            assert_raises_message(
++                exceptions.TemplateLookupException,
++                "cannot be relative outside of the root path",
++                tl.get_template,
++                "/" + rel,
++            )
++
++            # double-slash prefix must not bypass the check
++            assert_raises_message(
++                exceptions.TemplateLookupException,
++                "cannot be relative outside of the root path",
++                tl.get_template,
++                "//" + rel,
++            )
++
++            # triple-slash prefix must not bypass the check
++            assert_raises_message(
++                exceptions.TemplateLookupException,
++                "cannot be relative outside of the root path",
++                tl.get_template,
++                "///" + rel,
++            )
++
+     def test_checking_against_bad_filetype(self):
+         with tempfile.TemporaryDirectory() as tempdir:
+             tl = lookup.TemplateLookup(directories=[tempdir])
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-v92g-xgxw-vvmm", "package": "mako", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory+patch"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

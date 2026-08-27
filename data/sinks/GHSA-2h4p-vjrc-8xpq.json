@@ -1,0 +1,34 @@
+{
+  "advisory": "GHSA-2h4p-vjrc-8xpq",
+  "package": "mako",
+  "sinks": [
+    "mako.lookup.TemplateLookup.get_template",
+    "mako.template.Template.__init__"
+  ],
+  "confidence": "high",
+  "evidence": "fix commit 72e10c5 changes the URI normalisation in TemplateLookup.get_template and the u_norm check in Template.__init__",
+  "assumptions": [
+    "assumes both changed functions are required, since the advisory describes a mismatch between them rather than one flaw"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "mako.lookup.TemplateLookup.get_template": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.2.4",
+      "fixed_version": "1.3.12",
+      "note": "body differs between 1.2.4 and 1.3.12",
+      "location": "mako.lookup:TemplateLookup.get_template"
+    },
+    "mako.template.Template.__init__": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "1.2.4",
+      "fixed_version": "1.3.12",
+      "note": "body differs between 1.2.4 and 1.3.12",
+      "location": "mako.template:Template.__init__"
+    }
+  }
+}

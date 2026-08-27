@@ -1,0 +1,25 @@
+{
+  "advisory": "GHSA-w3h3-4rj7-4ph4",
+  "package": "gunicorn",
+  "sinks": [
+    "gunicorn.http.message.Message.parse_headers"
+  ],
+  "confidence": "low",
+  "evidence": "pull request 3113 is the same large change as GHSA-hc5x-x2vx-497g; the Python hunks in the prompt only show new Setting classes in gunicorn/config.py",
+  "assumptions": [
+    "the Transfer-Encoding validation lives in gunicorn/http/message.py, which the truncated diff does not show",
+    "the class and method names were inferred from gunicorn's structure"
+  ],
+  "mode": "advisory+patch",
+  "verification": {
+    "gunicorn.http.message.Message.parse_headers": {
+      "status": "verified",
+      "present_in_vulnerable": true,
+      "changed_in_fixed": true,
+      "vulnerable_version": "21.2.0",
+      "fixed_version": "22.0.0",
+      "note": "body differs between 21.2.0 and 22.0.0",
+      "location": "gunicorn.http.message:Message.parse_headers"
+    }
+  }
+}
