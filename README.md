@@ -8,10 +8,6 @@ Answers the question a dependency scanner cannot: can your code actually reach t
 vulnerabilities. 4 of those have a concrete call path from an entry point, 17 have no path in the
 static graph, and 55 cannot be decided. That third number is printed on purpose.
 
-AI helped write this, and a model is also part of the pipeline: it reads each advisory and names the
-vulnerable function. That guess is 40% accurate on its own, so every sink it produces is checked
-against the real patch diff before the tool is allowed to use it.
-
 ## Quick start
 
 ```bash
