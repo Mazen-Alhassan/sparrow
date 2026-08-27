@@ -1,0 +1,226 @@
+{
+  "call_sites": 293962,
+  "resolved": 103322,
+  "builtins": 56583,
+  "unresolved": 134057,
+  "causes": [
+    {
+      "rank": 1,
+      "cause": "outside_analysed_tree",
+      "count": 55638,
+      "share": 18.93,
+      "explanation": "stdlib or a package not in the lockfile",
+      "example": [
+        "superset.advanced_data_type.api:AdvancedDataTypeRestApi.get",
+        "ADVANCED_DATA_TYPES.get",
+        97
+      ]
+    },
+    {
+      "rank": 2,
+      "cause": "attribute_on_self_not_a_method",
+      "count": 18310,
+      "share": 6.23,
+      "explanation": "`self.x.y()` where x is an instance attribute the resolver never typed",
+      "example": [
+        "superset.async_events.async_query_manager:AsyncQueryManager.submit_explore_json_job",
+        "self._load_explore_json_into_cache_job.delay",
+        195
+      ]
+    },
+    {
+      "rank": 3,
+      "cause": "parameter_without_annotation",
+      "count": 17546,
+      "share": 5.97,
+      "explanation": "`def f(conn)` then `conn.execute()`, no annotation to type it",
+      "example": [
+        "superset.async_events.async_query_manager:build_job_metadata",
+        "kwargs.get",
+        46
+      ]
+    },
+    {
+      "rank": 4,
+      "cause": "local_bound_to_unknown_return",
+      "count": 15103,
+      "share": 5.14,
+      "explanation": "`x = f()` then `x.y()`, and f has no return annotation",
+      "example": [
+        "superset.advanced_data_type.api:AdvancedDataTypeRestApi.get",
+        "addon.translate_type",
+        106
+      ]
+    },
+    {
+      "rank": 5,
+      "cause": "indirect_call_subscript",
+      "count": 8312,
+      "share": 2.83,
+      "explanation": "`handlers[key]()`, the callee comes out of a container",
+      "example": [
+        "superset.advanced_data_type.plugins.internet_address:cidr_func",
+        "append",
+        48
+      ]
+    },
+    {
+      "rank": 6,
+      "cause": "attribute_on_imported_object",
+      "count": 4899,
+      "share": 1.67,
+      "explanation": "attribute of an imported object that is not a module, class, or function",
+      "example": [
+        "superset.advanced_data_type.api:<module>",
+        "event_logger.log_this_with_context",
+        58
+      ]
+    },
+    {
+      "rank": 7,
+      "cause": "parameter_annotation_unresolved",
+      "count": 3679,
+      "share": 1.25,
+      "explanation": "annotated, but the annotation is a generic, a string, or outside the tree",
+      "example": [
+        "superset.async_events.async_query_manager:AsyncQueryManager.parse_channel_id_from_request",
+        "req.cookies.get",
+        169
+      ]
+    },
+    {
+      "rank": 8,
+      "cause": "compiled_extension",
+      "count": 1986,
+      "share": 0.68,
+      "explanation": "the call crosses into a .so or .pyd",
+      "example": [
+        "superset.common.query_context_processor:QueryContextProcessor.processing_time_offsets",
+        "DateOffset",
+        493
+      ]
+    },
+    {
+      "rank": 9,
+      "cause": "indirect_call_expression",
+      "count": 1092,
+      "share": 0.37,
+      "explanation": "`f()()` or `(a or b)()`, the callee is a computed value",
+      "example": [
+        "superset.app:create_app",
+        "<expr>",
+        39
+      ]
+    },
+    {
+      "rank": 10,
+      "cause": "builtin_or_unbound_name",
+      "count": 919,
+      "share": 0.31,
+      "explanation": "a bare name that resolved to nothing at all",
+      "example": [
+        "superset.daos.dashboard:DashboardDAO.get_dashboard_and_slices_changed_on",
+        "max.replace",
+        137
+      ]
+    },
+    {
+      "rank": 11,
+      "cause": "super_call_unresolved",
+      "count": 554,
+      "share": 0.19,
+      "explanation": "`super().m()` where the parent class is outside the tree",
+      "example": [
+        "superset.async_events.async_query_manager:AsyncQueryManager.__init__",
+        "super.__init__",
+        75
+      ]
+    },
+    {
+      "rank": 12,
+      "cause": "attribute_on_local_definition",
+      "count": 475,
+      "share": 0.16,
+      "explanation": "attribute of a local class or function that is not one of its members",
+      "example": [
+        "superset.cli.main:<module>",
+        "superset.add_command",
+        54
+      ]
+    },
+    {
+      "rank": 13,
+      "cause": "unknown_receiver",
+      "count": 57,
+      "share": 0.02,
+      "explanation": "the receiving name was never bound anywhere the resolver looked",
+      "example": [
+        "superset.db_engine_specs.presto:PrestoBaseEngineSpec.query_cost_formatter",
+        "humanize.strip",
+        403
+      ]
+    }
+  ],
+  "top_unresolved_names": [
+    [
+      "get",
+      4397
+    ],
+    [
+      "append",
+      3019
+    ],
+    [
+      "join",
+      2683
+    ],
+    [
+      "format",
+      2122
+    ],
+    [
+      "update",
+      1953
+    ],
+    [
+      "pop",
+      1479
+    ],
+    [
+      "items",
+      1343
+    ],
+    [
+      "add",
+      895
+    ],
+    [
+      "split",
+      873
+    ],
+    [
+      "execute",
+      853
+    ],
+    [
+      "group",
+      821
+    ],
+    [
+      "replace",
+      811
+    ],
+    [
+      "write",
+      681
+    ],
+    [
+      "copy",
+      644
+    ],
+    [
+      "assertRaises",
+      641
+    ]
+  ]
+}
