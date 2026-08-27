@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-34jh-p97f-mpxf",
+  "package": "urllib3",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory describes the missing Proxy-Authorization stripping during cross-origin redirects in general terms, without naming the function or class responsible for rebuilding headers on redirect.",
+  "assumptions": [
+    "Likely implicated code is urllib3's redirect-handling logic, e.g. PoolManager.urlopen() or a helper that reconstructs headers for a redirected request, but no such identifier is named in the advisory text",
+    "The fix is described as urllib3 now stripping the header automatically on cross-origin redirects, which points at the same unnamed redirect-handling code path"
+  ],
+  "mode": "advisory-only"
+}

@@ -1,0 +1,80 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-f2ff-p2ww-7p4p (CVE-2026-71491)
+Package: sqlparse 0.4.4
+Fixed in: 0.6.0
+Severity: high
+
+Summary: sqlparse: Quadratic O(n²) DoS in group_comments
+
+Details:
+### Summary
+A comment-only statement (`-- c\n`*n) may cause a Denial of Service (DoS).
+
+### Details
+Location: [sqlparse/engine/grouping.py:331-341](https://github.com/andialbrecht/sqlparse/blob/f80af6a4007f11ada847218df8c29dc859238290/sqlparse/engine/grouping.py#L332) (`group_comments`), invoked first in `group()` at `grouping.py:439`. Reachable via `sqlparse.parse()` and `sqlparse.format(sql, strip_comments=True)`.
+
+A statement made of many single-line comments (`'-- c\n'` repeated) lexes in O(n) but `group_comments` is O(n²):
+
+```python
+def group_comments(tlist):
+    tidx, token = tlist.token_next_by(t=T.Comment)
+    while token:
+        eidx, end = tlist.token_not_matching(
+            lambda tk: imt(tk, t=T.Comment) or tk.is_newline, idx=tidx)
+        ...
+        tidx, token = tlist.token_next_by(t=T.Comment, idx=tidx)
+```
+
+The `while` loop runs n times and each `token_next_by` / `token_not_matching` rescans the O(n) remaining tokens. When all tokens are comments/newlines nothing ever groups, yet the full scan is repeated per token.
+
+Two following factors increase the severity:
+
+1. `group_comments` runs first in `group()` (`grouping.py:439`), before the `_group_matching` token-count guard (`grouping.py:34-39`). So the entire quadratic cost is paid even on oversized input. `MAX_GROUPING_TOKENS` does not provide protection on this vector.
+2. It sits on the primary sanitizer path: `format(sql, strip_comments=True)`, used by query loggers, SQL firewalls, ORMs, and migration tools.
+
+### PoC
+Tested using Python 3.14:
+
+```python
+import time, sqlparse
+for n in (1000, 2000, 4000):
+    s = "-- c\n" * n
+    t = time.perf_counter()
+    sqlparse.format(s, strip_comments=True)
+    print(f"n={n:5d}  format(strip_comments)={1000*(time.perf_counter()-t):7.1f} ms")
+```
+
+Output:
+
+```
+n= 1000  format(strip_comments)=  106.0 ms
+n= 2000  format(strip_comments)=  403.3 ms
+n= 4000  format(strip_comments)= 1602.8 ms
+```
+
+Time increase of ~4× per 2× input (quadratic). `parse()` shows the identical curve. Instrumented scan counts are exactly 1.0M / 4.0M / 16.0M tokens for n=1000/2000/4000. A ~250 KB comment-only payload forces minutes of CPU regardless of the 10000 token cap.
+
+### Impact
+Denial of Service
+
+References:
+- WEB: https://github.com/andialbrecht/sqlparse/security/advisories/GHSA-f2ff-p2ww-7p4p
+- WEB: https://github.com/andialbrecht/sqlparse/commit/ef2012a5eeb491e604dea2b00d516904a3830c87
+- PACKAGE: https://github.com/andialbrecht/sqlparse
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-f2ff-p2ww-7p4p", "package": "sqlparse", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

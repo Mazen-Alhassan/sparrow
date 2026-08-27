@@ -1,0 +1,39 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-2qfp-q593-8484 (CVE-2025-6176, GHSA-2qfp-q593-8484, PYSEC-2026-1906, PYSEC-2026-2401)
+Package: brotli 1.0.9
+Fixed in: 1.2.0
+Severity: high
+
+Summary: Scrapy is vulnerable to a denial of service (DoS) attack due to flaws in brotli decompression implementation
+
+Details:
+Scrapy versions up to 2.13.3 are vulnerable to a denial of service (DoS) attack due to a flaw in its brotli decompression implementation. The protection mechanism against decompression bombs fails to mitigate the brotli variant, allowing remote servers to crash clients with less than 80GB of available memory. This occurs because brotli can achieve extremely high compression ratios for zero-filled data, leading to excessive memory consumption during decompression. Mitigation for this vulnerability needs security enhancement added in brotli v1.2.0.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-6176
+- WEB: https://github.com/google/brotli/issues/1327
+- WEB: https://github.com/google/brotli/issues/1375
+- WEB: https://github.com/google/brotli/pull/1234
+- WEB: https://github.com/scrapy/scrapy/pull/7134
+- WEB: https://github.com/google/brotli/commit/67d78bc41db1a0d03f2e763497748f2f69946627
+- WEB: https://github.com/scrapy/scrapy/commit/14737e91edc513967f516fc839cc9c8a4f8d91da
+- PACKAGE: https://github.com/google/brotli
+- WEB: https://github.com/google/brotli/releases/tag/v1.2.0
+- WEB: https://huntr.com/bounties/2c26a886-5984-47ee-a421-0d5fe1344eb0
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-2qfp-q593-8484", "package": "brotli", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

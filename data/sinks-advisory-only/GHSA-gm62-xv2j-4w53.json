@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-gm62-xv2j-4w53",
+  "package": "urllib3",
+  "sinks": ["urllib3.response.HTTPResponse._init_decoder"],
+  "confidence": "low",
+  "evidence": "Advisory describes an unbounded chain of stacked Content-Encoding decompressors built while reading a response; no specific function is named, so the decoder-chain construction routine on HTTPResponse is the best-guess sink.",
+  "assumptions": [
+    "Advisory does not name a specific function; urllib3.response.HTTPResponse._init_decoder is a guess based on general knowledge of where urllib3 builds its decoder chain from the Content-Encoding header, not stated in the advisory text",
+    "The chain-building/limiting logic could instead live in a class such as urllib3.response.MultiDecoder or in a decode()/read() method rather than _init_decoder",
+    "Remediation mentioning preload_content=False and inspecting resp.headers['content-encoding'] suggests the flaw is in response decoding rather than request/connection handling, which supports (but does not confirm) this module choice"
+  ],
+  "mode": "advisory-only"
+}

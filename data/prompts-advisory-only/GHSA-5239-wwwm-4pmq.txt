@@ -1,0 +1,38 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-5239-wwwm-4pmq (CVE-2026-4539, GHSA-5239-wwwm-4pmq, PYSEC-2026-2987)
+Package: pygments 2.15.0
+Fixed in: 2.20.0
+Severity: low
+
+Summary: Pygments has Regular Expression Denial of Service (ReDoS) due to Inefficient Regex for GUID Matching
+
+Details:
+A security flaw has been discovered in pygments before 2.20.0. The impacted element is the function AdlLexer of the file pygments/lexers/archetype.py. The manipulation results in inefficient regular expression complexity. The attack is only possible with local access. The exploit has been released to the public and may be used for attacks. The project was informed of the problem early through an issue report but has not responded yet.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-4539
+- WEB: https://github.com/pygments/pygments/issues/3058
+- WEB: https://github.com/pygments/pygments/pull/3064
+- WEB: https://github.com/pygments/pygments/commit/24b8aa76c6cd6d70f39c6dd605cce319c98e2ccc
+- PACKAGE: https://github.com/pygments/pygments
+- WEB: https://github.com/pygments/pygments/releases/tag/2.20.0
+- WEB: https://vuldb.com/?ctiid.352327
+- WEB: https://vuldb.com/?id.352327
+- WEB: https://vuldb.com/?submit.774685
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-5239-wwwm-4pmq", "package": "pygments", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

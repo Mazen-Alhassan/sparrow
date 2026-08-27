@@ -1,0 +1,57 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-34jh-p97f-mpxf (CVE-2024-37891, GHSA-34jh-p97f-mpxf, PYSEC-2026-1995)
+Package: urllib3 1.26.6
+Fixed in: 1.26.19, 2.2.2
+Severity: moderate
+
+Summary: urllib3's Proxy-Authorization request header isn't stripped during cross-origin redirects
+
+Details:
+When using urllib3's proxy support with `ProxyManager`, the `Proxy-Authorization` header is only sent to the configured proxy, as expected.
+
+However, when sending HTTP requests *without* using urllib3's proxy support, it's possible to accidentally configure the `Proxy-Authorization` header even though it won't have any effect as the request is not using a forwarding proxy or a tunneling proxy. In those cases, urllib3 doesn't treat the `Proxy-Authorization` HTTP header as one carrying authentication material and thus doesn't strip the header on cross-origin redirects.
+
+Because this is a highly unlikely scenario, we believe the severity of this vulnerability is low for almost all users. Out of an abundance of caution urllib3 will automatically strip the `Proxy-Authorization` header during cross-origin redirects to avoid the small chance that users are doing this on accident.
+
+Users should use urllib3's proxy support or disable automatic redirects to achieve safe processing of the `Proxy-Authorization` header, but we still decided to strip the header by default in order to further protect users who aren't using the correct approach.
+
+## Affected usages
+
+We believe the number of usages affected by this advisory is low. It requires all of the following to be true to be exploited:
+
+* Setting the `Proxy-Authorization` header without using urllib3's built-in proxy support.
+* Not disabling HTTP redirects.
+* Either not using an HTTPS origin server or for the proxy or target origin to redirect to a malicious origin.
+
+## Remediation
+
+* Using the `Proxy-Authorization` header with urllib3's `ProxyManager`.
+* Disabling HTTP redirects using `redirects=False` when sending requests.
+* Not using the `Proxy-Authorization` header.
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-34jh-p97f-mpxf
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-37891
+- WEB: https://github.com/urllib3/urllib3/commit/40b6d1605814dd1db0a46e202d6e56f2e4c9a468
+- WEB: https://github.com/urllib3/urllib3/commit/accff72ecc2f6cf5a76d9570198a93ac7c90270e
+- PACKAGE: https://github.com/urllib3/urllib3
+- WEB: https://lists.debian.org/debian-lts-announce/2024/12/msg00020.html
+- WEB: https://security.netapp.com/advisory/ntap-20240822-0003
+- WEB: https://www.vicarius.io/vsociety/posts/proxy-authorization-header-handling-vulnerability-in-urllib3-cve-2024-37891
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-34jh-p97f-mpxf", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

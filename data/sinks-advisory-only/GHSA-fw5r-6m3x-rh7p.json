@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-fw5r-6m3x-rh7p",
+  "package": "flask-appbuilder",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory describes missing/weak Cache-Control, Pragma, and Expires headers on the /login response letting browsers cache sensitive form data; it names no function, class, or module.",
+  "assumptions": [
+    "If a sink must be named, the most plausible candidate is the auth DB login view handler, e.g. flask_appbuilder.security.views.AuthDBView.login, but this class/module path is a guess not stated anywhere in the advisory",
+    "The fix could instead live in a shared base view, a response-decorating utility, or app-wide after_request hook rather than the login view itself",
+    "Left sinks empty rather than guess, since the advisory is about response header configuration, not a named vulnerable code path"
+  ],
+  "mode": "advisory-only"
+}

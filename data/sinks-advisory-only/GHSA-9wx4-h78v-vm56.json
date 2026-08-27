@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-9wx4-h78v-vm56",
+  "package": "requests",
+  "sinks": ["requests.adapters.HTTPAdapter.send"],
+  "confidence": "low",
+  "evidence": "Advisory describes TLS verification settings persisting across a session's pooled connection after the first request set verify=False, implicating the connection-pooling/adapter send path, but names no specific function.",
+  "assumptions": [
+    "Assumed the flaw and fix are in requests.adapters.HTTPAdapter.send (or its cert_verify/get_connection helper methods), since HTTPAdapter owns the connection pool and cert verification logic; not stated in the advisory.",
+    "The actual root cause could instead be in requests.adapters.HTTPAdapter.cert_verify, HTTPAdapter.get_connection, or in urllib3's connection-pool reuse logic outside the requests package entirely.",
+    "Could not confirm the exact function from advisory text alone."
+  ],
+  "mode": "advisory-only"
+}

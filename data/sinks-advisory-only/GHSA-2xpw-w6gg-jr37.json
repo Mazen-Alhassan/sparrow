@@ -1,0 +1,18 @@
+{
+  "advisory": "GHSA-2xpw-w6gg-jr37",
+  "package": "urllib3",
+  "sinks": [
+    "urllib3.response.HTTPResponse.stream",
+    "urllib3.response.HTTPResponse.read",
+    "urllib3.response.HTTPResponse.read1",
+    "urllib3.response.HTTPResponse.read_chunked",
+    "urllib3.response.HTTPResponse.readinto"
+  ],
+  "confidence": "high",
+  "evidence": "Advisory explicitly lists stream(), read(amt=256), read1(amt=256), read_chunked(amt=256), and readinto(b) as urllib3.HTTPResponse method calls that use the affected decompression logic.",
+  "assumptions": [
+    "Assumed module path urllib3.response for HTTPResponse, since urllib3.HTTPResponse is normally a re-export of urllib3.response.HTTPResponse",
+    "The actual over-decompression logic is likely centralized in a shared internal decoder helper these methods call rather than duplicated in each method, but the advisory does not name that helper, so the sinks are listed at the public-method level the advisory itself names"
+  ],
+  "mode": "advisory-only"
+}

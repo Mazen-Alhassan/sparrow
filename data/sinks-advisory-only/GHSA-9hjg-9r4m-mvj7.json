@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-9hjg-9r4m-mvj7",
+  "package": "requests",
+  "sinks": ["requests.utils.get_netrc_auth"],
+  "confidence": "low",
+  "evidence": "Advisory attributes the leak to a 'URL parsing issue' causing .netrc credentials to be sent to unintended hosts for maliciously-crafted URLs, without naming a specific function.",
+  "assumptions": [
+    "Assumed the netrc credential lookup happens in requests.utils.get_netrc_auth based on general knowledge of the requests package, not stated in the advisory.",
+    "The root 'URL parsing issue' may actually be in requests.utils.urldefragauth, requests.models.PreparedRequest.prepare_url, or in how Session.prepare_request/Session.send determines the host used for the netrc lookup, rather than in get_netrc_auth itself.",
+    "The trust_env=False workaround points at Session-level behavior but is not itself the flawed function."
+  ],
+  "mode": "advisory-only"
+}

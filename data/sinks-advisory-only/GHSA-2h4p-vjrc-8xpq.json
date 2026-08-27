@@ -1,0 +1,15 @@
+{
+  "advisory": "GHSA-2h4p-vjrc-8xpq",
+  "package": "mako",
+  "sinks": [
+    "mako.lookup.TemplateLookup.get_template",
+    "mako.template.Template.__init__"
+  ],
+  "confidence": "high",
+  "evidence": "Advisory's 'Affected code' section explicitly names TemplateLookup.get_template() in mako/lookup.py (posixpath-based URI normalization) and Template.__init__() in mako/template.py (os.path-based traversal validation) as the two locations whose mismatched path semantics cause the traversal.",
+  "assumptions": [
+    "Assumed module paths mako.lookup and mako.template map directly to the file paths mako/lookup.py and mako/template.py given in the advisory",
+    "Treated both functions as sinks since the advisory frames the vulnerability as a mismatch between the two, rather than a single flawed function"
+  ],
+  "mode": "advisory-only"
+}

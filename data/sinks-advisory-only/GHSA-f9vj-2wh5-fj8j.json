@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-f9vj-2wh5-fj8j",
+  "package": "werkzeug",
+  "sinks": ["werkzeug.security.safe_join"],
+  "confidence": "medium",
+  "evidence": "Advisory explicitly names safe_join() as the function that relies on the Windows-unsafe os.path.isabs() check and can produce an unsafe path.",
+  "assumptions": [
+    "Module path guessed as werkzeug.security; safe_join has historically lived in different modules across Werkzeug versions (werkzeug.security in older releases, werkzeug.utils in others), so the module could be wrong",
+    "Assumed safe_join is a plain module-level function rather than a class method",
+    "Did not add downstream callers (e.g. send_from_directory) as sinks since the advisory attributes the flaw to safe_join itself"
+  ],
+  "mode": "advisory-only"
+}

@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-h5c8-rqwp-cp95",
+  "package": "jinja2",
+  "sinks": ["jinja2.filters.do_xmlattr"],
+  "confidence": "medium",
+  "evidence": "Advisory explicitly names the xmlattr filter as accepting keys containing spaces, enabling HTML attribute injection when user input is used as a key.",
+  "assumptions": [
+    "Module path jinja2.filters is inferred from Jinja's general source layout, not stated in the advisory",
+    "Function name do_xmlattr is inferred from Jinja's do_<filtername> filter-implementation naming convention (same convention as the 'attr' filter -> do_attr), not explicitly stated in the advisory",
+    "Assumed the flaw is in the filter's key-validation logic itself rather than in a shared escaping helper it calls"
+  ],
+  "mode": "advisory-only"
+}

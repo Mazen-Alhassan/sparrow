@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-f2ff-p2ww-7p4p",
+  "package": "sqlparse",
+  "sinks": ["sqlparse.engine.grouping.group_comments"],
+  "confidence": "high",
+  "evidence": "Advisory explicitly names group_comments at sqlparse/engine/grouping.py:331-341 as the O(n^2) function, invoked first from group() at grouping.py:439.",
+  "assumptions": [
+    "Module path sqlparse.engine.grouping is inferred directly from the given file path sqlparse/engine/grouping.py, assumed to match the package's import layout",
+    "Did not list the public entry points sqlparse.parse() / sqlparse.format() as sinks themselves, since the advisory attributes the quadratic cost specifically to group_comments, not to the entry points, even though they are the reachable callers",
+    "Assumed group_comments is a plain module-level function (not a class method), consistent with the advisory's code excerpt"
+  ],
+  "mode": "advisory-only"
+}

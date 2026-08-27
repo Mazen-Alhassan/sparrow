@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-428g-f7cq-pgp5",
+  "package": "marshmallow",
+  "sinks": ["marshmallow.schema.Schema.load"],
+  "confidence": "high",
+  "evidence": "The advisory's Impact section explicitly names `Schema.load(data, many=True)` as the vulnerable call causing disproportionate CPU consumption.",
+  "assumptions": [
+    "Assumed the Schema class lives at marshmallow.schema.Schema based on standard marshmallow package layout; not confirmed by the advisory text.",
+    "The quadratic/CPU-heavy behavior may actually live in a helper invoked by load (e.g. an internal _do_load or per-item validation loop), with load itself only being the public entry point named by the advisory."
+  ],
+  "mode": "advisory-only"
+}

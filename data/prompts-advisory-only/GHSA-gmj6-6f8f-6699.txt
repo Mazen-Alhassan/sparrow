@@ -1,0 +1,37 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-gmj6-6f8f-6699 (CVE-2024-56201, GHSA-gmj6-6f8f-6699, PYSEC-2026-1472)
+Package: jinja2 3.1.2
+Fixed in: 3.1.5
+Severity: moderate
+
+Summary: Jinja has a sandbox breakout through malicious filenames
+
+Details:
+A bug in the Jinja compiler allows an attacker that controls both the content and filename of a template to execute arbitrary Python code, regardless of if Jinja's sandbox is used.
+
+To exploit the vulnerability, an attacker needs to control both the filename and the contents of a template. Whether that is the case depends on the type of application using Jinja. This vulnerability impacts users of applications which execute untrusted templates where the template author can also choose the template filename.
+
+References:
+- WEB: https://github.com/pallets/jinja/security/advisories/GHSA-gmj6-6f8f-6699
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-56201
+- WEB: https://github.com/pallets/jinja/issues/1792
+- WEB: https://github.com/pallets/jinja/commit/767b23617628419ae3709ccfb02f9602ae9fe51f
+- PACKAGE: https://github.com/pallets/jinja
+- WEB: https://github.com/pallets/jinja/releases/tag/3.1.5
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-gmj6-6f8f-6699", "package": "jinja2", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

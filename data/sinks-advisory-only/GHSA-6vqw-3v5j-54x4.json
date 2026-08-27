@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-6vqw-3v5j-54x4",
+  "package": "cryptography",
+  "sinks": ["cryptography.hazmat.primitives.serialization.pkcs12.serialize_key_and_certificates"],
+  "confidence": "high",
+  "evidence": "Advisory explicitly names `pkcs12.serialize_key_and_certificates` as the vulnerable function, triggered when a certificate/private-key mismatch is combined with an hmac_hash encryption_algorithm override.",
+  "assumptions": [
+    "Assumed the standard cryptography package module path cryptography.hazmat.primitives.serialization.pkcs12 for the pkcs12 module; not stated verbatim in the advisory.",
+    "The NULL pointer dereference may actually occur in a lower-level C/Rust binding function called by serialize_key_and_certificates rather than in the Python-level function itself, since cryptography's PKCS12 serialization is backed by OpenSSL/rust bindings."
+  ],
+  "mode": "advisory-only"
+}

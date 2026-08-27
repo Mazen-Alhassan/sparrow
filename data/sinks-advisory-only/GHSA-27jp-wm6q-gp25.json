@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-27jp-wm6q-gp25",
+  "package": "sqlparse",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory names no specific function; it only describes the symptom that formatting a long list of tuples hangs, referencing a Django regression test rather than sqlparse internals.",
+  "assumptions": [
+    "Likely related to sqlparse's grouping/formatting logic for parenthesized or comma-separated token lists (e.g. something in sqlparse.engine.grouping or sqlparse.formatter), but this is not stated in the advisory",
+    "Could share a root cause with GHSA-2m57-hf25-phgg's recursive TokenList handling, but the two advisories are not explicitly linked in this text"
+  ],
+  "mode": "advisory-only"
+}

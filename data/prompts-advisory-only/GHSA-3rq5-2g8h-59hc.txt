@@ -1,0 +1,41 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-3rq5-2g8h-59hc (CVE-2023-29483, GHSA-3rq5-2g8h-59hc, PYSEC-2026-1307, PYSEC-2026-2472)
+Package: dnspython 2.1.0
+Fixed in: 2.6.1
+Severity: moderate
+
+Summary: Potential DoS via the Tudoor mechanism in eventlet and dnspython
+
+Details:
+eventlet before 0.35.2, as used in dnspython before 2.6.0, allows remote attackers to interfere with DNS name resolution by quickly sending an invalid packet from the expected IP address and source port, aka a "TuDoor" attack. In other words, dnspython does not have the preferred behavior in which the DNS name resolution algorithm would proceed, within the full time window, in order to wait for a valid packet. NOTE: dnspython 2.6.0 is unusable for a different reason that was addressed in 2.6.1.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2023-29483
+- WEB: https://github.com/eventlet/eventlet/issues/913
+- WEB: https://github.com/rthalley/dnspython/issues/1045
+- WEB: https://github.com/eventlet/eventlet/commit/51e3c4928d4938beb576eff34f3bf97e6e64e6b4
+- WEB: https://github.com/rthalley/dnspython/commit/0ea5ad0a4583e1f519b9bcc67cfac381230d9cf2
+- PACKAGE: https://github.com/eventlet/eventlet
+- WEB: https://github.com/eventlet/eventlet/releases/tag/v0.35.2
+- WEB: https://github.com/rthalley/dnspython/releases/tag/v2.6.0
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/NLRKR57IFVKQC2GCXZBFLCLBAWBWL3F6
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/VOHJOO3OM65UIUUUVDEXMCTXNM6LXZEH
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/X3BNSIK5NFYSAP53Y45GOCMOQHHDLGIF
+- WEB: https://security.netapp.com/advisory/ntap-20240510-0001
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-3rq5-2g8h-59hc", "package": "dnspython", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

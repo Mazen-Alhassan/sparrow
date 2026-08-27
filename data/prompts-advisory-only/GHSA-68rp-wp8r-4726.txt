@@ -1,0 +1,40 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-68rp-wp8r-4726 (CVE-2026-27205, GHSA-68rp-wp8r-4726, PYSEC-2026-2151)
+Package: flask 2.2.5
+Fixed in: 3.1.3
+Severity: low
+
+Summary: Flask session does not add `Vary: Cookie` header when accessed in some ways
+
+Details:
+When the `session` object is accessed, Flask should set the `Vary: Cookie` header. This instructs caches not to cache the response, as it may contain information specific to a logged in user. This is handled in most cases, but some forms of access such as the Python `in` operator were overlooked.
+
+The severity depends on the application's use of the session, and the cache's behavior regarding cookies. The risk depends on all these conditions being met.
+
+1. The application must be hosted behind a caching proxy that does not ignore responses with cookies.
+2. The application does not set a `Cache-Control` header to indicate that a page is private or should not be cached.
+3. The application accesses the session in a way that does not access the values, only the keys, and does not mutate the session.
+
+References:
+- WEB: https://github.com/pallets/flask/security/advisories/GHSA-68rp-wp8r-4726
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2026-27205
+- WEB: https://github.com/pallets/flask/commit/089cb86dd22bff589a4eafb7ab8e42dc357623b4
+- PACKAGE: https://github.com/pallets/flask
+- WEB: https://github.com/pallets/flask/releases/tag/3.1.3
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-68rp-wp8r-4726", "package": "flask", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

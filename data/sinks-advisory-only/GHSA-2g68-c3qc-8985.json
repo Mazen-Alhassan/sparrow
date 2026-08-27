@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-2g68-c3qc-8985",
+  "package": "werkzeug",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory describes 'the debugger in affected versions of Werkzeug' generically, without naming a specific function or class involved in the PIN check or code execution path.",
+  "assumptions": [
+    "Likely implicated code is werkzeug.debug.DebuggedApplication (the WSGI app serving the interactive debugger) and/or its PIN-validation logic, but no function name is given in the advisory text to confirm this",
+    "The 'attacker controlled domain' framing suggests the flaw involves how the debugger evaluates trust/host information, but the exact function is unnamed"
+  ],
+  "mode": "advisory-only"
+}

@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-gc5v-m9x4-r6x2",
+  "package": "requests",
+  "sinks": ["requests.utils.extract_zipped_paths"],
+  "confidence": "high",
+  "evidence": "Advisory explicitly names requests.utils.extract_zipped_paths() as the function that reuses a predictable temp filename when extracting files from zip archives.",
+  "assumptions": [
+    "None significant: the advisory gives the fully qualified name (requests.utils.extract_zipped_paths) directly",
+    "Assumed 'Standard usage of the Requests library is not affected' means no other reachable sink (e.g. Session.get) should be listed, since only direct callers of this utility are impacted"
+  ],
+  "mode": "advisory-only"
+}

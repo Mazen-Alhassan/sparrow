@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-38jv-5279-wg99",
+  "package": "urllib3",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory describes the library reading and decompressing the entire redirect response body to drain the connection, but does not name the specific method that performs this drain/decompress step.",
+  "assumptions": [
+    "A plausible identifier is urllib3.response.HTTPResponse.drain_conn (a connection-draining method invoked when following redirects with preload_content=False), but this name is not stated anywhere in the advisory text and is only a guess",
+    "Could alternatively be inside urllib3's PoolManager or HTTPConnectionPool redirect-following logic rather than HTTPResponse itself"
+  ],
+  "mode": "advisory-only"
+}

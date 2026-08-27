@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-765j-9r45-w2q2",
+  "package": "flask-appbuilder",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory describes the password-reset endpoint remaining registered and reachable regardless of the configured auth type, but names no specific view class or method.",
+  "assumptions": [
+    "Likely involves a view class such as flask_appbuilder.security.views.ResetMyPasswordView or ResetPasswordView and its route/view registration, based on typical Flask-AppBuilder naming conventions, not stated in the advisory.",
+    "The actual fix may instead be in the security manager's view-registration logic (e.g. flask_appbuilder.security.manager.BaseSecurityManager) that conditionally registers views based on AUTH_TYPE, rather than in the reset-password view itself.",
+    "Could not determine the exact module path or method name from the advisory text alone."
+  ],
+  "mode": "advisory-only"
+}

@@ -1,0 +1,49 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-gm62-xv2j-4w53 (CVE-2025-66418, GHSA-gm62-xv2j-4w53, PYSEC-2026-1998)
+Package: urllib3 1.26.6
+Fixed in: 2.6.0
+Severity: high
+
+Summary: urllib3 allows an unbounded number of links in the decompression chain
+
+Details:
+## Impact
+
+urllib3 supports chained HTTP encoding algorithms for response content according to RFC 9110 (e.g., `Content-Encoding: gzip, zstd`).
+
+However, the number of links in the decompression chain was unbounded allowing a malicious server to insert a virtually unlimited number of compression steps leading to high CPU usage and massive memory allocation for the decompressed data.
+
+
+## Affected usages
+
+Applications and libraries using urllib3 version 2.5.0 and earlier for HTTP requests to untrusted sources unless they disable content decoding explicitly.
+
+
+## Remediation
+
+Upgrade to at least urllib3 v2.6.0 in which the library limits the number of links to 5.
+
+If upgrading is not immediately possible, use [`preload_content=False`](https://urllib3.readthedocs.io/en/2.5.0/advanced-usage.html#streaming-and-i-o) and ensure that `resp.headers["content-encoding"]` contains a safe number of encodings before reading the response content.
+
+References:
+- WEB: https://github.com/urllib3/urllib3/security/advisories/GHSA-gm62-xv2j-4w53
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2025-66418
+- WEB: https://github.com/urllib3/urllib3/commit/24d7b67eac89f94e11003424bcf0d8f7b72222a8
+- PACKAGE: https://github.com/urllib3/urllib3
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-gm62-xv2j-4w53", "package": "urllib3", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

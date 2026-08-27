@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-99pm-ch96-ccp2",
+  "package": "flask-appbuilder",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory describes an open redirect via Host header injection and introduces a new FAB_SAFE_REDIRECT_HOSTS config to fix it, but does not name the vulnerable function.",
+  "assumptions": [
+    "Likely involves a redirect-URL construction helper (e.g. something like get_safe_redirect) in flask_appbuilder.security.views or flask_appbuilder.baseviews, based on typical naming conventions in Flask-AppBuilder and similar Flask extensions, not stated in the advisory.",
+    "The vulnerable code path likely builds a redirect target from request.host or a 'next' parameter without validating it against an allowlist; exact function/class not stated in the advisory.",
+    "Could not determine the exact module path or method name from the advisory text alone."
+  ],
+  "mode": "advisory-only"
+}

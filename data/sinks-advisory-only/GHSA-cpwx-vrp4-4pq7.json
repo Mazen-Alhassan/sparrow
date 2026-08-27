@@ -1,0 +1,14 @@
+{
+  "advisory": "GHSA-cpwx-vrp4-4pq7",
+  "package": "jinja2",
+  "sinks": ["jinja2.filters.do_attr"],
+  "confidence": "medium",
+  "evidence": "Advisory names the `|attr` filter as the vector that bypasses the sandboxed environment's attribute-lookup restriction to reach a string's plain format method.",
+  "assumptions": [
+    "Module path jinja2.filters is inferred from Jinja's general source layout, not stated in the advisory",
+    "Function name do_attr is inferred from Jinja's do_<filtername> filter-implementation naming convention, not explicitly stated in the advisory",
+    "The true fix could equally be attributed to jinja2.sandbox.SandboxedEnvironment.getattr (the method the attr filter is supposed to route through but bypasses); the advisory only says the interaction between the two was buggy",
+    "Assumed the flaw is in the filter implementation itself rather than in sandbox.py's is_safe_attribute/is_safe_callable checks"
+  ],
+  "mode": "advisory-only"
+}

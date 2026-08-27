@@ -1,0 +1,40 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-f73w-4m7g-ch9x (CVE-2023-39631, GHSA-f73w-4m7g-ch9x, PYSEC-2023-162, PYSEC-2023-163)
+Package: numexpr 2.8.4
+Fixed in: 2.8.5
+Severity: critical
+
+Summary: Langchain vulnerable to arbitrary code execution via the evaluate function in the numexpr library
+
+Details:
+An issue in LanChain-ai Langchain v.0.0.245 allows a remote attacker to execute arbitrary code via the evaluate function in the numexpr library.
+
+Patches: Released in v.0.0.308. numexpr dependency is optional for langchain.
+
+References:
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2023-39631
+- WEB: https://github.com/langchain-ai/langchain/issues/8363
+- WEB: https://github.com/pydata/numexpr/issues/442
+- WEB: https://github.com/langchain-ai/langchain/pull/11302
+- WEB: https://github.com/pydata/numexpr/commit/4b2d89cf14e75030d27629925b9998e1e91d23c7
+- PACKAGE: https://github.com/langchain-ai/langchain
+- WEB: https://github.com/langchain-ai/langchain/releases/tag/v0.0.308
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/langchain/PYSEC-2023-162.yaml
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/numexpr/PYSEC-2023-163.yaml
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-f73w-4m7g-ch9x", "package": "numexpr", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

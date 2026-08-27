@@ -1,0 +1,76 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-3496-9g83-7v6x (CVE-2026-59894)
+Package: sqlparse 0.4.4
+Fixed in: 0.6.0
+Severity: moderate
+
+Summary: sqlparse: Generated Python and PHP snippets allow SQL string breakout through unescaped backslashes
+
+Details:
+### Summary
+
+The documented Python and PHP output modes generate source-code snippets from caller-supplied SQL. Their output filters escape quote characters without first escaping existing backslashes. Crafted SQL can therefore neutralize the generated quote escape, terminate the intended language string, and place attacker-controlled code into the generated snippet. If a downstream consumer executes or imports that generated source, the injected code runs in the consumer's environment.
+
+### Details
+
+The Python output filter places SQL in a single-quoted string and replaces each single quote with an escaped quote. The PHP output filter performs the equivalent operation for a double-quoted string. Neither transformation escapes pre-existing backslashes before escaping quotes. A backslash supplied immediately before a quote causes the generated backslash to be escaped instead of the quote, allowing the quote to close the string.
+
+The affected modes are exposed through `sqlparse.format(..., output_format='python')`, `sqlparse.format(..., output_format='php')`, and the corresponding `sqlformat -l` options. Formatting produces the injected source but does not itself execute it; code execution occurs when a downstream workflow treats the generated snippet as Python or PHP code.
+
+Relevant code locations:
+
+- `sqlparse/formatter.py:193` — selection of the output-language filters
+- `sqlparse/filters/output.py:45` — opening of the generated Python string
+- `sqlparse/filters/output.py:65` — incomplete Python quote escaping
+- `sqlparse/filters/output.py:91` — opening of the generated PHP string
+- `sqlparse/filters/output.py:114` — incomplete PHP quote escaping
+
+### PoC
+
+A complete validated reproduction is attached as [output_format_snippet_injection-poc.zip](https://github.com/user-attachments/files/29410134/output_format_snippet_injection-poc.zip). The archive contains `reproduction/` at its root, uses Git and Docker, and validates the Python output path by generating and executing a snippet containing a controlled marker-file write.
+
+Extract the archive beside this report, then run:
+
+```console
+./reproduction/run.sh
+```
+
+Observed result:
+
+The generated Python snippet placed the attacker-controlled `pathlib.Path(...).write_text(...)` expression outside the intended SQL string. Executing the snippet wrote the expected proof marker, emitted `EVOHUNT_OUTPUT_FORMAT_INJECTION_VERIFIED`, and completed successfully.
+
+Verification method:
+
+The verification helper calls `sqlparse.format(..., output_format='python')`, executes the generated snippet, and fails unless the injected Python expression writes the exact proof marker file.
+
+Limitations:
+
+No reproduction blocker was recorded. The attached harness directly verifies the Python output path; exploitation also requires a downstream consumer to execute or import the generated source.
+
+### Impact
+
+This is source-code injection in the opt-in Python and PHP snippet-generation modes. An attacker who controls SQL converted by one of these modes can inject language code into the generated artifact. If that artifact is subsequently executed, the attacker can run code with the permissions and access of the downstream Python or PHP process.
+
+The demonstrated end-to-end result is code execution through a generated Python snippet. Formatting the SQL alone does not execute the payload, and ordinary parsing, splitting, or formatting without these output modes is not shown to be affected.
+
+References:
+- WEB: https://github.com/andialbrecht/sqlparse/security/advisories/GHSA-3496-9g83-7v6x
+- WEB: https://github.com/andialbrecht/sqlparse/commit/53ff44b53e27cff78259acc1af015506fea60f63
+- PACKAGE: https://github.com/andialbrecht/sqlparse
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-3496-9g83-7v6x", "package": "sqlparse", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

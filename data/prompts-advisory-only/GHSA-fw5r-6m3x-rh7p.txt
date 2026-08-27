@@ -1,0 +1,44 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-fw5r-6m3x-rh7p (CVE-2024-45314, GHSA-fw5r-6m3x-rh7p, PYSEC-2026-1382)
+Package: flask-appbuilder 4.3.10
+Fixed in: 4.5.1
+Severity: moderate
+
+Summary: Flask-AppBuilder's login form allows browser to cache sensitive fields 
+
+Details:
+### Impact
+Auth DB login form default cache directives allows browser to locally store sensitive data. This can be an issue on environments using shared computer resources.
+
+### Patches
+Upgrade flask-appbuilder to version 4.5.1
+
+### Workarounds
+If upgrading is not possible configure your web server to send the following HTTP headers for /login:
+"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+"Pragma": "no-cache"
+"Expires": "0" 
+
+
+References:
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/security/advisories/GHSA-fw5r-6m3x-rh7p
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-45314
+- WEB: https://github.com/dpgaspar/Flask-AppBuilder/commit/3030e881d2e44f4021764e18e489fe940a9b3636
+- PACKAGE: https://github.com/dpgaspar/Flask-AppBuilder
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-fw5r-6m3x-rh7p", "package": "flask-appbuilder", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

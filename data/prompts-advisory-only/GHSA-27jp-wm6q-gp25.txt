@@ -1,0 +1,39 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-27jp-wm6q-gp25 (none)
+Package: sqlparse 0.4.4
+Fixed in: 0.5.4
+Severity: moderate
+
+Summary: sqlparse: formatting list of tuples leads to denial of service
+
+Details:
+### Summary
+The below gist hangs while attempting to format a long list of tuples.
+
+This was found while [drafting a regression test for Dja
+ngo 5.2's composite primary key feature](https://code.djangoproject.com/ticket/36416#comment:3), which allows querying composite fields with tuples.
+
+###
+
+References:
+- WEB: https://github.com/andialbrecht/sqlparse/security/advisories/GHSA-27jp-wm6q-gp25
+- WEB: https://github.com/andialbrecht/sqlparse/commit/40ed3aa958657fa4a82055927fa9de70ab903360
+- PACKAGE: https://github.com/andialbrecht/sqlparse
+- WEB: https://github.com/andialbrecht/sqlparse/releases/tag/0.5.4
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-27jp-wm6q-gp25", "package": "sqlparse", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

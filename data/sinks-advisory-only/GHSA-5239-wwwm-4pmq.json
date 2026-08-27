@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-5239-wwwm-4pmq",
+  "package": "pygments",
+  "sinks": ["pygments.lexers.archetype.AdlLexer.get_tokens_unprocessed"],
+  "confidence": "medium",
+  "evidence": "Advisory names 'the function AdlLexer' in pygments/lexers/archetype.py as the impacted element, describing inefficient regex complexity in GUID matching.",
+  "assumptions": [
+    "The advisory calls AdlLexer a 'function' but it is actually a Lexer class; assumed the vulnerable regex is a class-level 'tokens' pattern exercised through the inherited RegexLexer.get_tokens_unprocessed method rather than a method defined directly on AdlLexer.",
+    "Module path pygments.lexers.archetype is taken directly from the advisory's stated file path (pygments/lexers/archetype.py).",
+    "It's possible the vulnerable regex is actually reached via a different entry point such as get_tokens (the public wrapper) rather than get_tokens_unprocessed."
+  ],
+  "mode": "advisory-only"
+}

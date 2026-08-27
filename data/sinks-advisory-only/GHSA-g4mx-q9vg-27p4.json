@@ -1,0 +1,14 @@
+{
+  "advisory": "GHSA-g4mx-q9vg-27p4",
+  "package": "urllib3",
+  "sinks": ["urllib3.connectionpool.HTTPConnectionPool.urlopen"],
+  "confidence": "low",
+  "evidence": "Advisory describes urllib3 failing to strip the request body when a 303 redirect changes the request method from POST to GET; no specific function is named, so urlopen is named as the general redirect-orchestration entry point.",
+  "assumptions": [
+    "Advisory does not name a specific function; urlopen is a guess based on general knowledge of urllib3's redirect-handling architecture, not derived from the advisory text itself",
+    "The actual body-stripping/method-change logic could instead sit in urllib3.poolmanager.PoolManager.urlopen or a helper function it calls",
+    "Method-change-on-redirect detection could alternatively live in urllib3.util.retry.Retry.increment",
+    "Workarounds section (redirects=False) suggests the flaw is in automatic-redirect handling generally, consistent with urlopen, but this is inference not a stated fact"
+  ],
+  "mode": "advisory-only"
+}

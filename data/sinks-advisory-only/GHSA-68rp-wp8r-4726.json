@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-68rp-wp8r-4726",
+  "package": "flask",
+  "sinks": ["flask.sessions.SecureCookieSession.__contains__"],
+  "confidence": "medium",
+  "evidence": "Advisory states the Python `in` operator on the session object was overlooked when deciding to set the Vary: Cookie header, which corresponds to the session class's __contains__ dunder method.",
+  "assumptions": [
+    "Assumed the session class is flask.sessions.SecureCookieSession (Flask's default session implementation); not stated verbatim in the advisory.",
+    "Assumed the access-tracking mechanism that triggers the Vary: Cookie header lives in the same class as __contains__, rather than in a decorator/mixin applied elsewhere.",
+    "The fix might instead touch a shared base such as flask.sessions.SessionMixin rather than SecureCookieSession directly."
+  ],
+  "mode": "advisory-only"
+}

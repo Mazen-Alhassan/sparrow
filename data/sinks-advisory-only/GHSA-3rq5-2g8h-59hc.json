@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-3rq5-2g8h-59hc",
+  "package": "dnspython",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory describes a protocol-level DoS (TuDoor) affecting DNS resolution timing/validation shared between eventlet and dnspython, but names no specific function or method in either codebase.",
+  "assumptions": [
+    "The flaw plausibly lives in dnspython's UDP query handling (e.g. dns.query.udp / dns.query.receive_udp) or in dns.resolver.Resolver.resolve's retry/timeout loop, but this is not stated in the advisory.",
+    "The root cause may actually reside in the eventlet package's socket/DNS code rather than in dnspython itself, since dnspython is described only as 'used' alongside eventlet.",
+    "Any dnspython module path (dns.query, dns.resolver) would be inferred from general package knowledge, not from the advisory text."
+  ],
+  "mode": "advisory-only"
+}

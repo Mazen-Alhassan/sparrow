@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-f73w-4m7g-ch9x",
+  "package": "numexpr",
+  "sinks": ["numexpr.evaluate"],
+  "confidence": "high",
+  "evidence": "Advisory explicitly names 'the evaluate function in the numexpr library' as the arbitrary-code-execution vector.",
+  "assumptions": [
+    "Assumed evaluate is importable at the top-level path numexpr.evaluate (a re-export) rather than only as numexpr.necompiler.evaluate, its likely true implementation module",
+    "Assumed the flaw is in numexpr's own evaluate() rather than solely in how LangChain's LLMMathChain constructs and passes untrusted expressions into it, even though the advisory title also names Langchain",
+    "Did not add a LangChain-side sink (e.g. an LLMMathChain method) since the advisory's summary singles out numexpr's evaluate as the code-execution function"
+  ],
+  "mode": "advisory-only"
+}

@@ -1,0 +1,37 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-2g68-c3qc-8985 (CVE-2024-34069, GHSA-2g68-c3qc-8985, PYSEC-2026-2043)
+Package: werkzeug 2.3.3
+Fixed in: 3.0.3
+Severity: high
+
+Summary: Werkzeug debugger vulnerable to remote execution when interacting with attacker controlled domain
+
+Details:
+The debugger in affected versions of Werkzeug can allow an attacker to execute code on a developer's machine under some circumstances. This requires the attacker to get the developer to interact with a domain and subdomain they control, and enter the debugger PIN, but if they are successful it allows access to the debugger even if it is only running on localhost. This also requires the attacker to guess a URL in the developer's application that will trigger the debugger.
+
+References:
+- WEB: https://github.com/pallets/werkzeug/security/advisories/GHSA-2g68-c3qc-8985
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-34069
+- WEB: https://github.com/pallets/werkzeug/commit/3386395b24c7371db11a5b8eaac0c91da5362692
+- PACKAGE: https://github.com/pallets/werkzeug
+- WEB: https://lists.debian.org/debian-lts-announce/2025/02/msg00026.html
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/H4SH32AM3CTPMAAEOIDAN7VU565LO4IR
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HFERFN7PINV4MOGMGA3DPIXJPDCYOEJZ
+- WEB: https://security.netapp.com/advisory/ntap-20240614-0004
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-2g68-c3qc-8985", "package": "werkzeug", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

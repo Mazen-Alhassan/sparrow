@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-2qfp-q593-8484",
+  "package": "brotli",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory discusses Scrapy's brotli decompression usage and brotli's high compression ratio for zero-filled data causing a decompression bomb, but names no specific brotli or Scrapy function or class.",
+  "assumptions": [
+    "Package is listed as 'brotli' though the described vulnerability is really about Scrapy's integration with brotli decompression; the actual code fix landed in google/brotli 1.2.0's decompression path (e.g. a Decompressor/decompress-style function) but no exact identifier is given in the text",
+    "Could alternatively implicate Scrapy's own decompression response-size guard (mentioned as the failing 'protection mechanism'), which is also unnamed in this advisory"
+  ],
+  "mode": "advisory-only"
+}

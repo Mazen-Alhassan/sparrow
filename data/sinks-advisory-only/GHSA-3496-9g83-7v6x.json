@@ -1,0 +1,16 @@
+{
+  "advisory": "GHSA-3496-9g83-7v6x",
+  "package": "sqlparse",
+  "sinks": [
+    "sqlparse.filters.output.OutputPythonFilter",
+    "sqlparse.filters.output.OutputPHPFilter"
+  ],
+  "confidence": "medium",
+  "evidence": "Advisory's 'Relevant code locations' section gives exact file:line pointers into sqlparse/filters/output.py for the opening and incomplete quote-escaping of both the Python string (lines 45, 65) and the PHP string (lines 91, 114), identifying the Python and PHP output filters as the flawed components, though it names them descriptively rather than by exact class/method identifier.",
+  "assumptions": [
+    "Class names OutputPythonFilter and OutputPHPFilter are inferred from the descriptive text ('Python output filter', 'PHP output filter') and sqlparse's known output_format='python'/'php' options; the advisory itself never states these class names verbatim",
+    "The exact method containing the escaping logic (e.g. a _process-style method) is not named in the advisory, so sinks are given at class granularity rather than class.method",
+    "sqlparse/formatter.py:193 (selection of output-language filters) is treated as a dispatcher/caller, not included as a sink since the flaw is described as being in the escaping logic itself, not the selection code"
+  ],
+  "mode": "advisory-only"
+}

@@ -1,0 +1,44 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-6vqw-3v5j-54x4 (CVE-2024-26130, GHSA-6vqw-3v5j-54x4, PYSEC-2024-225)
+Package: cryptography 41.0.2
+Fixed in: 42.0.4
+Severity: high
+
+Summary: cryptography NULL pointer dereference with pkcs12.serialize_key_and_certificates when called with a non-matching certificate and private key and an hmac_hash override
+
+Details:
+If `pkcs12.serialize_key_and_certificates` is called with both:
+
+1. A certificate whose public key did not match the provided private key
+2. An `encryption_algorithm` with `hmac_hash` set (via `PrivateFormat.PKCS12.encryption_builder().hmac_hash(...)`
+
+Then a NULL pointer dereference would occur, crashing the Python process.
+
+This has been resolved, and now a `ValueError` is properly raised.
+
+Patched in https://github.com/pyca/cryptography/pull/10423
+
+References:
+- WEB: https://github.com/pyca/cryptography/security/advisories/GHSA-6vqw-3v5j-54x4
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-26130
+- WEB: https://github.com/pyca/cryptography/pull/10423
+- WEB: https://github.com/pyca/cryptography/commit/97d231672763cdb5959a3b191e692a362f1b9e55
+- PACKAGE: https://github.com/pyca/cryptography
+- WEB: https://github.com/pypa/advisory-database/tree/main/vulns/cryptography/PYSEC-2024-225.yaml
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-6vqw-3v5j-54x4", "package": "cryptography", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

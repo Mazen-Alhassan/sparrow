@@ -1,0 +1,40 @@
+You convert advisory prose into function-level sinks for a static reachability analyser.
+
+Mode: advisory-only
+You get the advisory text and nothing else. No diff, no source, no lookups.
+
+Advisory GHSA-9wx4-h78v-vm56 (CVE-2024-35195, GHSA-9wx4-h78v-vm56, PYSEC-2026-1873)
+Package: requests 2.31.0
+Fixed in: 2.32.0
+Severity: moderate
+
+Summary: Requests `Session` object does not verify requests after making first request with verify=False
+
+Details:
+When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even if `verify=True` is explicitly specified later.
+
+This occurs because the underlying connection is reused from the session's connection pool, causing the initial TLS verification setting to persist for the lifetime of the pooled connection. As a result, applications may unintentionally send requests without certificate verification, leading to potential man-in-the-middle attacks and compromised confidentiality or integrity.
+
+This behavior affects versions of `requests` prior to 2.32.0.
+
+References:
+- WEB: https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56
+- ADVISORY: https://nvd.nist.gov/vuln/detail/CVE-2024-35195
+- WEB: https://github.com/psf/requests/pull/6655
+- WEB: https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac
+- PACKAGE: https://github.com/psf/requests
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/IYLSNK5TL46Q6XPRVMHVWS63MVJQOK4Q
+- WEB: https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/N7WP6EYDSUOCOJYHDK5NX43PYZ4SNHGZ
+
+
+Return exactly this JSON object and nothing else:
+
+{"advisory": "GHSA-9wx4-h78v-vm56", "package": "requests", "sinks": ["pkg.module.Class.method"],
+ "confidence": "high|medium|low", "evidence": "...", "assumptions": ["..."], "mode": "advisory-only"}
+
+Rules:
+- Fully qualified identifiers only. A bare function name is not an answer.
+- Name the function that contains the flaw, not the public API a user calls, unless they are the same.
+- sinks may be empty. An empty list with an honest assumption beats a guess.
+- confidence is high only when the advisory or the patch names the function.
+- Put every inference that could be wrong in assumptions. A verifier checks them against the patch diff.

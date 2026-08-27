@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-87hc-h4r5-73f7",
+  "package": "werkzeug",
+  "sinks": ["werkzeug.utils.safe_join"],
+  "confidence": "high",
+  "evidence": "Advisory explicitly names `safe_join()` as the vulnerable function, and states `send_from_directory` uses it to safely serve files, making send_from_directory the caller rather than the flaw's location.",
+  "assumptions": [
+    "Assumed safe_join currently lives in werkzeug.utils for this version range (2.3.3-3.1.5); in older Werkzeug releases this function lived in werkzeug.security instead, and the advisory does not state the module path.",
+    "send_from_directory (werkzeug.utils.send_from_directory) is treated only as the caller, per the advisory's statement that safe_join is the root cause."
+  ],
+  "mode": "advisory-only"
+}

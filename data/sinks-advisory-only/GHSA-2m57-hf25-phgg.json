@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-2m57-hf25-phgg",
+  "package": "sqlparse",
+  "sinks": ["sqlparse.sql.TokenList.flatten"],
+  "confidence": "high",
+  "evidence": "Advisory's traceback and fix suggestion both explicitly name TokenList.flatten() in sqlparse/sql.py as the recursively self-calling generator that exhausts the stack on deeply nested input.",
+  "assumptions": [
+    "Assumed module path sqlparse.sql based on the file path sqlparse/sql.py shown in the traceback and fix suggestion",
+    "The traceback also passes through grouping.group/_group_matching and sql.py's group_tokens/__init__/__str__, but the advisory's own fix suggestion targets flatten() specifically, so only that function is listed as the sink"
+  ],
+  "mode": "advisory-only"
+}

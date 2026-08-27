@@ -1,0 +1,13 @@
+{
+  "advisory": "GHSA-gmj6-6f8f-6699",
+  "package": "jinja2",
+  "sinks": [],
+  "confidence": "low",
+  "evidence": "Advisory attributes the bug to 'a bug in the Jinja compiler' triggered by a malicious template filename, without naming any specific function, class, or module.",
+  "assumptions": [
+    "Likely lives somewhere in jinja2.compiler (e.g. the CodeGenerator class) since the advisory blames 'the Jinja compiler', but this is inference, not stated",
+    "Could alternatively be in jinja2.environment.Environment.compile or template-loading code that passes the filename into the compiled module's metadata (e.g. as a Python module name or in generated source), which is exactly the kind of implementation detail this advisory-only mode cannot verify",
+    "Chose to leave sinks empty rather than guess a specific compiler function, since the advisory text gives no name to anchor on beyond 'the Jinja compiler'"
+  ],
+  "mode": "advisory-only"
+}

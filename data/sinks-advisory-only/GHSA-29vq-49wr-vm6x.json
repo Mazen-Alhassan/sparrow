@@ -1,0 +1,12 @@
+{
+  "advisory": "GHSA-29vq-49wr-vm6x",
+  "package": "werkzeug",
+  "sinks": ["werkzeug.utils.safe_join"],
+  "confidence": "medium",
+  "evidence": "Advisory explicitly names safe_join() as the function whose Windows-device-name filtering is incomplete; send_from_directory is described only as a caller that relies on safe_join.",
+  "assumptions": [
+    "Assumed module path werkzeug.utils based on current werkzeug layout; safe_join has historically also lived in werkzeug.security in older releases, so the exact import path is uncertain",
+    "Did not include send_from_directory as a sink since the advisory frames it as a downstream caller, not the location of the flaw itself"
+  ],
+  "mode": "advisory-only"
+}
