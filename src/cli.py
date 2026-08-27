@@ -23,6 +23,10 @@ from .sparrow.taint import trace
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "moderate": 2, "medium": 2, "low": 3, "unknown": 4}
 
+# What counts as a failing run. `undetermined` includes `reachable`, because a job that wants to
+# stop on things the analysis could not settle also wants to stop on the ones it could.
+FAIL_LEVELS = {"never": (), "reachable": (REACHABLE,), "undetermined": (REACHABLE, UNDETERMINED)}
+
 
 class Timer:
     def __init__(self) -> None:
@@ -47,6 +51,11 @@ def _relative(path: Path) -> str:
         return str(path.relative_to(Path.cwd()))
     except ValueError:
         return str(path)
+
+
+def _exit_code(fail_on: str, counts: dict) -> int:
+    """A scanner that cannot fail a build is a report, not a gate."""
+    return 1 if sum(counts[bucket] for bucket in FAIL_LEVELS[fail_on]) else 0
 
 
 def _log(args, message: str) -> None:
@@ -193,7 +202,11 @@ def scan(args) -> int:
     report.write_json(results, out)
     _log(args, f"[7/7] wrote {_relative(out)}")
     report.render(results, show=args.show, limit=args.limit)
-    return 0
+    code = _exit_code(args.fail_on, counts)
+    if code:
+        _log(args, f"failing: --fail-on {args.fail_on} and "
+                   f"{sum(counts[b] for b in FAIL_LEVELS[args.fail_on])} findings match")
+    return code
 
 
 def prompts(args) -> int:
@@ -258,9 +271,11 @@ def main(argv=None) -> int:
     scan_parser.add_argument("--workers", type=int, default=12)
     scan_parser.add_argument("--llm", action="store_true", help="extract missing sinks via the API")
     scan_parser.add_argument("--mode", default="advisory+patch", choices=list(extract.MODES))
+    scan_parser.add_argument("--fail-on", default="never", choices=list(FAIL_LEVELS),
+                             help="exit 1 when findings land in this bucket or worse")
     scan_parser.set_defaults(func=scan)
 
-    prompts_parser = sub.add_parser("prompts", help="write extraction prompts for the agent")
+    prompts_parser = sub.add_parser("prompts", help="write extraction prompts for the extractor")
     common(prompts_parser)
     prompts_parser.add_argument("--out", default="data/prompts")
     prompts_parser.add_argument("--mode", default="advisory-only", choices=list(extract.MODES))
