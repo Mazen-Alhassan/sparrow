@@ -1,0 +1,3080 @@
+{
+  "tool": "sparrow",
+  "generated": "2026-08-18T19:34:45Z",
+  "target": {
+    "name": "sample-report-service",
+    "root": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample",
+    "roots": [
+      "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample",
+      "/Users/mazenalhassan/.cache/sparrow/pkgs"
+    ],
+    "lockfile": "requirements.txt"
+  },
+  "stats": {
+    "packages": 15,
+    "packages_failed": [],
+    "modules": 271,
+    "files": 269,
+    "scopes": 4550,
+    "parse_errors": 2,
+    "native_modules": 2,
+    "edges": 10970,
+    "edge_kinds": {
+      "call": 4153,
+      "ctor": 888,
+      "import": 3763,
+      "ref": 954,
+      "virtual": 1212,
+      "unresolved": 4166,
+      "external": 3658,
+      "native": 8
+    },
+    "entry_points": 6,
+    "entry_point_kinds": {
+      "app_factory": 1,
+      "cli_command": 2,
+      "registered_callable": 2,
+      "wsgi_asgi": 1
+    },
+    "reachable_nodes": 587,
+    "reachable_nodes_medium": 1226,
+    "imported_modules": 194,
+    "dynamic_sites_in_reachable_code": 22,
+    "dynamic_closure_nodes": 1987,
+    "dynamic_import_seeds": 4
+  },
+  "counts": {
+    "advisories_raw": 71,
+    "advisories_unique": 39,
+    "reachable": 7,
+    "undetermined": 21,
+    "unreachable": 11,
+    "reachable_direct": 2,
+    "reachable_tainted": 1,
+    "packages_with_advisories": 10
+  },
+  "entry_points": [
+    {
+      "kind": "app_factory",
+      "node": "app:create_app",
+      "detail": "app:create_app",
+      "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+      "line": 6
+    },
+    {
+      "kind": "cli_command",
+      "node": "app.cli:main",
+      "detail": "click.group",
+      "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+      "line": 7
+    },
+    {
+      "kind": "cli_command",
+      "node": "app.cli:sync",
+      "detail": "main.command",
+      "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+      "line": 13
+    },
+    {
+      "kind": "registered_callable",
+      "node": "app.views:create_report",
+      "detail": "add_url_rule()",
+      "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+      "line": 14
+    },
+    {
+      "kind": "registered_callable",
+      "node": "app.views:export_report",
+      "detail": "add_url_rule()",
+      "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+      "line": 21
+    },
+    {
+      "kind": "wsgi_asgi",
+      "node": "app:<module>",
+      "detail": "app",
+      "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+      "line": 1
+    }
+  ],
+  "findings": [
+    {
+      "advisory": "GHSA-752w-5fwx-jx9f",
+      "cve": "CVE-2026-32597",
+      "merged_ids": [
+        "PYSEC-2026-120"
+      ],
+      "package": "pyjwt",
+      "version": "2.4.0",
+      "direct": true,
+      "severity": "high",
+      "summary": "PyJWT accepts unknown `crit` header extensions",
+      "bucket": "reachable",
+      "reason": "call_path",
+      "sinks": [
+        "jwt.api_jws.PyJWS._verify_signature"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "low",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the function name was inferred from where header validation happens in PyJWT, not from a diff",
+        "the fix may add a new helper rather than change _verify_signature, in which case this sink will fail verification",
+        "2.4.0 may name the method differently"
+      ],
+      "evidence": "",
+      "taint": {
+        "status": "tainted",
+        "reason": "request data reaches the vulnerable function's arguments",
+        "source": "request.headers.get",
+        "broke_at": "",
+        "hops": [
+          "app.views:create_report -> app.auth:current_user carrying request.headers.get",
+          "app.auth:current_user -> jwt.api_jwt:PyJWT.decode carrying token",
+          "jwt.api_jwt:PyJWT.decode -> jwt.api_jwt:PyJWT.decode_complete carrying options",
+          "jwt.api_jwt:PyJWT.decode_complete -> jwt.api_jws:PyJWS.decode_complete carrying options",
+          "jwt.api_jws:PyJWS.decode_complete -> jwt.api_jws:PyJWS._verify_signature carrying algorithms"
+        ]
+      },
+      "paths": [
+        {
+          "sink": "jwt.api_jws:PyJWS._verify_signature",
+          "entrypoint": {
+            "kind": "registered_callable",
+            "node": "app.views:create_report",
+            "detail": "add_url_rule()",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+            "line": 14
+          },
+          "frames": [
+            {
+              "node": "app.views:create_report",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+              "line": 14,
+              "edge": "entry"
+            },
+            {
+              "node": "app.auth:current_user",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/auth.py",
+              "line": 15,
+              "edge": "call"
+            },
+            {
+              "node": "jwt.api_jwt:PyJWT.decode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/pyjwt/2.4.0/src/jwt/api_jwt.py",
+              "line": 10,
+              "edge": "call"
+            },
+            {
+              "node": "jwt.api_jwt:PyJWT.decode_complete",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/pyjwt/2.4.0/src/jwt/api_jwt.py",
+              "line": 129,
+              "edge": "call"
+            },
+            {
+              "node": "jwt.api_jws:PyJWS.decode_complete",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/pyjwt/2.4.0/src/jwt/api_jws.py",
+              "line": 100,
+              "edge": "call"
+            },
+            {
+              "node": "jwt.api_jws:PyJWS._verify_signature",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/pyjwt/2.4.0/src/jwt/api_jws.py",
+              "line": 182,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-v845-jxx5-vc9f",
+      "cve": "CVE-2023-43804",
+      "merged_ids": [
+        "PYSEC-2023-192"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "high",
+      "summary": "`Cookie` HTTP header isn't stripped on cross-origin redirects",
+      "bucket": "reachable",
+      "reason": "call_path",
+      "sinks": [
+        "urllib3.util.retry.Retry"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the sink is a class attribute, so the class node is named instead of a function",
+        "the code that acts on it is HTTPConnectionPool.urlopen, which the fix did not touch"
+      ],
+      "evidence": "",
+      "taint": {
+        "status": "unknown",
+        "reason": "path hop is a import edge, not a call",
+        "source": "",
+        "broke_at": "app.fetcher:<module>",
+        "hops": []
+      },
+      "paths": [
+        {
+          "sink": "urllib3.util.retry:Retry.__init__",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:main",
+            "detail": "click.group",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 7
+          },
+          "frames": [
+            {
+              "node": "app.cli:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "requests:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.util.retry:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/retry.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.util.retry:Retry.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/retry.py",
+              "line": 602,
+              "edge": "ctor"
+            }
+          ]
+        },
+        {
+          "sink": "urllib3.util.retry:Retry.from_int",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 58,
+              "edge": "ctor"
+            },
+            {
+              "node": "requests.adapters:HTTPAdapter.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/adapters.py",
+              "line": 450,
+              "edge": "ctor"
+            },
+            {
+              "node": "urllib3.util.retry:Retry.from_int",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/retry.py",
+              "line": 145,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-65pc-fj4g-8rjx",
+      "cve": "CVE-2026-45409",
+      "merged_ids": [
+        "PYSEC-2026-215"
+      ],
+      "package": "idna",
+      "version": "3.4",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Internationalized Domain Names in Applications (IDNA): Specially crafted inputs to idna.encode() can bypass CVE-2024-3651 fix",
+      "bucket": "reachable",
+      "reason": "call_path",
+      "sinks": [
+        "idna.core.encode",
+        "idna.core.valid_contexto"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "function names come from the advisory prose, not from a diff",
+        "assumes both live in idna.core in 3.2",
+        "the fix is a length check added in encode, so valid_contexto itself may be unchanged"
+      ],
+      "evidence": "",
+      "taint": {
+        "status": "clean",
+        "reason": "fetch_upstream is called with no request derived argument",
+        "source": "",
+        "broke_at": "app.cli:sync",
+        "hops": []
+      },
+      "paths": [
+        {
+          "sink": "idna.core:encode",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 59,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.prepare_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 575,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 486,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 368,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:parse_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 434,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_normalize_host",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 383,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_idna_encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 297,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 312,
+              "edge": "call"
+            }
+          ]
+        },
+        {
+          "sink": "idna.core:valid_contexto",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 59,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.prepare_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 575,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 486,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 368,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:parse_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 434,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_normalize_host",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 383,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_idna_encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 297,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 312,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:alabel",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 360,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:check_label",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 269,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:valid_contexto",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 247,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-jjg7-2v4v-x38h",
+      "cve": "CVE-2024-3651",
+      "merged_ids": [
+        "PYSEC-2024-60"
+      ],
+      "package": "idna",
+      "version": "3.4",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Internationalized Domain Names in Applications (IDNA) vulnerable to denial of service from specially crafted inputs to idna.encode",
+      "bucket": "reachable",
+      "reason": "call_path",
+      "sinks": [
+        "idna.core.encode",
+        "idna.core.alabel"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the real fix commit is not linked, so the sink was inferred from the advisory text",
+        "alabel was included because the length rejection was added to the per-label path, and it may not have changed"
+      ],
+      "evidence": "",
+      "taint": {
+        "status": "clean",
+        "reason": "fetch_upstream is called with no request derived argument",
+        "source": "",
+        "broke_at": "app.cli:sync",
+        "hops": []
+      },
+      "paths": [
+        {
+          "sink": "idna.core:encode",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 59,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.prepare_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 575,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 486,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 368,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:parse_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 434,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_normalize_host",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 383,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_idna_encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 297,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 312,
+              "edge": "call"
+            }
+          ]
+        },
+        {
+          "sink": "idna.core:alabel",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 59,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.prepare_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 575,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 486,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 368,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:parse_url",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 434,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_normalize_host",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 383,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.util.url:_idna_encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/url.py",
+              "line": 297,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:encode",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 312,
+              "edge": "call"
+            },
+            {
+              "node": "idna.core:alabel",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/idna/3.4/src/idna/core.py",
+              "line": 360,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-9hjg-9r4m-mvj7",
+      "cve": "CVE-2024-47081",
+      "merged_ids": [
+        "PYSEC-2026-1872"
+      ],
+      "package": "requests",
+      "version": "2.31.0",
+      "direct": true,
+      "severity": "moderate",
+      "summary": "Requests vulnerable to .netrc credentials leak via malicious URLs",
+      "bucket": "reachable",
+      "reason": "call_path",
+      "sinks": [
+        "requests.utils.get_netrc_auth"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the flaw is in get_netrc_auth and not in Session.prepare_request, which calls it"
+      ],
+      "evidence": "",
+      "taint": {
+        "status": "clean",
+        "reason": "fetch_upstream is called with no request derived argument",
+        "source": "",
+        "broke_at": "app.cli:sync",
+        "hops": []
+      },
+      "paths": [
+        {
+          "sink": "requests.utils:get_netrc_auth",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 59,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.prepare_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 575,
+              "edge": "call"
+            },
+            {
+              "node": "requests.utils:get_netrc_auth",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/utils.py",
+              "line": 483,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-34jh-p97f-mpxf",
+      "cve": "CVE-2024-37891",
+      "merged_ids": [
+        "PYSEC-2026-1995"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "urllib3's Proxy-Authorization request header isn't stripped during cross-origin redirects",
+      "bucket": "reachable",
+      "reason": "call_path",
+      "sinks": [
+        "urllib3.util.retry.Retry"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the sink is a class attribute, not a function, so the class node is named instead",
+        "the code that acts on the value is HTTPConnectionPool.urlopen, which the fix did not touch"
+      ],
+      "evidence": "",
+      "taint": {
+        "status": "unknown",
+        "reason": "path hop is a import edge, not a call",
+        "source": "",
+        "broke_at": "app.fetcher:<module>",
+        "hops": []
+      },
+      "paths": [
+        {
+          "sink": "urllib3.util.retry:Retry.__init__",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:main",
+            "detail": "click.group",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 7
+          },
+          "frames": [
+            {
+              "node": "app.cli:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "requests:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.util.retry:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/retry.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.util.retry:Retry.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/retry.py",
+              "line": 602,
+              "edge": "ctor"
+            }
+          ]
+        },
+        {
+          "sink": "urllib3.util.retry:Retry.from_int",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 58,
+              "edge": "ctor"
+            },
+            {
+              "node": "requests.adapters:HTTPAdapter.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/adapters.py",
+              "line": 450,
+              "edge": "ctor"
+            },
+            {
+              "node": "urllib3.util.retry:Retry.from_int",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/util/retry.py",
+              "line": 145,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-pq67-6m6q-mj2v",
+      "cve": "CVE-2025-50181",
+      "merged_ids": [
+        "PYSEC-2026-1999"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "urllib3 redirects are not disabled when retries are disabled on PoolManager instantiation",
+      "bucket": "reachable",
+      "reason": "call_path",
+      "sinks": [
+        "urllib3.poolmanager.PoolManager.__init__",
+        "urllib3.poolmanager.PoolManager.urlopen"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the fix targets the 2.x tree while this pin is 1.26.6, where both functions exist with the same names"
+      ],
+      "evidence": "",
+      "taint": {
+        "status": "clean",
+        "reason": "fetch_upstream is called with no request derived argument",
+        "source": "",
+        "broke_at": "app.cli:sync",
+        "hops": []
+      },
+      "paths": [
+        {
+          "sink": "urllib3.poolmanager:PoolManager.__init__",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 58,
+              "edge": "ctor"
+            },
+            {
+              "node": "requests.adapters:HTTPAdapter.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/adapters.py",
+              "line": 450,
+              "edge": "ctor"
+            },
+            {
+              "node": "requests.adapters:HTTPAdapter.init_poolmanager",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/adapters.py",
+              "line": 155,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.poolmanager:PoolManager.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/poolmanager.py",
+              "line": 192,
+              "edge": "ctor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-f2ff-p2ww-7p4p",
+      "cve": "CVE-2026-71491",
+      "merged_ids": [],
+      "package": "sqlparse",
+      "version": "0.4.4",
+      "direct": true,
+      "severity": "high",
+      "summary": "sqlparse: Quadratic O(n\u00b2) DoS in group_comments",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "sqlparse.engine.grouping.group_comments"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the Python hunks shown are the benchmark script, so the change to group_comments itself was inferred from the advisory text"
+      ],
+      "evidence": "unresolved call .run() at /Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/__init__.py:59",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "sqlparse.engine.grouping:group_comments",
+          "entrypoint": {
+            "kind": "registered_callable",
+            "node": "app.views:export_report",
+            "detail": "add_url_rule()",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+            "line": 21
+          },
+          "frames": [
+            {
+              "node": "app.views:export_report",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+              "line": 21,
+              "edge": "entry"
+            },
+            {
+              "node": "app.plugins:export",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/plugins.py",
+              "line": 23,
+              "edge": "call"
+            },
+            {
+              "node": "app.exporters.csv_exporter:export",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/exporters/csv_exporter.py",
+              "line": 15,
+              "edge": "dynamic"
+            },
+            {
+              "node": "sqlparse:format",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/__init__.py",
+              "line": 6,
+              "edge": "call"
+            },
+            {
+              "node": "sqlparse.engine.filter_stack:FilterStack.run",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/engine/filter_stack.py",
+              "line": 59,
+              "edge": "dynamic"
+            },
+            {
+              "node": "sqlparse.engine.grouping:group",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/engine/grouping.py",
+              "line": 36,
+              "edge": "call"
+            },
+            {
+              "node": "sqlparse.engine.grouping:group_comments",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/engine/grouping.py",
+              "line": 397,
+              "edge": "ref"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-prg7-hcfm-mfcr",
+      "cve": "CVE-2026-59893",
+      "merged_ids": [],
+      "package": "sqlparse",
+      "version": "0.4.4",
+      "direct": true,
+      "severity": "high",
+      "summary": "sqlparse: Inefficient Regex Handling of Dollar-Quoted SQL Literals Leads to ReDoS (Denial of Service)",
+      "bucket": "undetermined",
+      "reason": "no_verified_sink",
+      "sinks": [
+        "sqlparse.keywords.SQL_REGEX"
+      ],
+      "sink_status": "absent_in_vulnerable",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "SQL_REGEX is a module level list, not a function, so it cannot be named as a function sink and this identifier will fail verification",
+        "the function that executes it is sqlparse.lexer.Lexer.get_tokens, which the fix may not have changed"
+      ],
+      "evidence": "no function-level sink survived patch verification",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-pwgv-4x5q-6m9f",
+      "cve": "CVE-2026-54284",
+      "merged_ids": [],
+      "package": "sqlparse",
+      "version": "0.4.4",
+      "direct": true,
+      "severity": "high",
+      "summary": "sqlparse: TokenList.__init__ materializes O(subtree) value per group, causing CPU DoS before depth/token caps trigger",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "sqlparse.sql.TokenList.__init__",
+        "sqlparse.sql.TokenList.group_tokens"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes both changed functions carry the flaw rather than only __init__"
+      ],
+      "evidence": "'app.exporters.csv_exporter' is imported by name at app.plugins:export",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "sqlparse.sql:TokenList.__init__",
+          "entrypoint": {
+            "kind": "dynamic",
+            "node": "app.exporters.csv_exporter:<module>",
+            "detail": "loaded at runtime",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/exporters/csv_exporter.py",
+            "line": 1
+          },
+          "frames": [
+            {
+              "node": "app.exporters.csv_exporter:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/exporters/csv_exporter.py",
+              "line": 1,
+              "edge": "dynamic_import"
+            },
+            {
+              "node": "sqlparse:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "sqlparse.sql:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/sql.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "sqlparse.sql:TokenList.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/sql.py",
+              "line": 1,
+              "edge": "ref"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-2xpw-w6gg-jr37",
+      "cve": "CVE-2025-66471",
+      "merged_ids": [
+        "PYSEC-2026-1994"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "high",
+      "summary": "urllib3 streaming API improperly handles highly compressed data",
+      "bucket": "undetermined",
+      "reason": "callback_reference",
+      "sinks": [
+        "urllib3.response.HTTPResponse.read",
+        "urllib3.response.GzipDecoder.decompress",
+        "urllib3.response.DeflateDecoder.decompress"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the fix is written against the 2.x layout and this pin is 1.26.6, so the function names were mapped by hand",
+        "assumes the 1.26 decoders and HTTPResponse.read carry the same flaw",
+        "ContentDecoder.decompress in 1.26 is an abstract stub, so the concrete decoders were named instead"
+      ],
+      "evidence": "path exists only through a medium confidence edge",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "urllib3.response:HTTPResponse.read",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:main",
+            "detail": "click.group",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 7
+          },
+          "frames": [
+            {
+              "node": "app.cli:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "requests:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.connectionpool:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/connectionpool.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.response:HTTPResponse.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/response.py",
+              "line": 1,
+              "edge": "ref"
+            },
+            {
+              "node": "urllib3.response:HTTPResponse.read",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/response.py",
+              "line": 260,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-gm62-xv2j-4w53",
+      "cve": "CVE-2025-66418",
+      "merged_ids": [
+        "PYSEC-2026-1998"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "high",
+      "summary": "urllib3 allows an unbounded number of links in the decompression chain",
+      "bucket": "undetermined",
+      "reason": "callback_reference",
+      "sinks": [
+        "urllib3.response.MultiDecoder.__init__"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the fix targets the 2.x tree while this pin is 1.26.6, where MultiDecoder exists with the same constructor"
+      ],
+      "evidence": "path exists only through a medium confidence edge",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "urllib3.response:MultiDecoder.__init__",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:main",
+            "detail": "click.group",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 7
+          },
+          "frames": [
+            {
+              "node": "app.cli:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "requests:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.connectionpool:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/connectionpool.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "urllib3.response:HTTPResponse.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/response.py",
+              "line": 1,
+              "edge": "ref"
+            },
+            {
+              "node": "urllib3.response:HTTPResponse.read",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/response.py",
+              "line": 260,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.response:HTTPResponse._init_decoder",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/response.py",
+              "line": 502,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.response:_get_decoder",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/response.py",
+              "line": 378,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.response:MultiDecoder.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/response.py",
+              "line": 146,
+              "edge": "ctor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-2g68-c3qc-8985",
+      "cve": "CVE-2024-34069",
+      "merged_ids": [
+        "PYSEC-2026-2043"
+      ],
+      "package": "werkzeug",
+      "version": "2.3.3",
+      "direct": false,
+      "severity": "high",
+      "summary": "Werkzeug debugger vulnerable to remote execution when interacting with attacker controlled domain",
+      "bucket": "undetermined",
+      "reason": "virtual_dispatch",
+      "sinks": [
+        "werkzeug.debug.DebuggedApplication.execute_command",
+        "werkzeug.debug.DebuggedApplication.debug_application",
+        "werkzeug.debug.DebuggedApplication.pin_auth",
+        "werkzeug.debug.DebuggedApplication.__call__"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the module path is werkzeug.debug, which is a package __init__.py",
+        "check_host_trust does not exist in the vulnerable version so it cannot be the sink",
+        "display_console was omitted to stay within five sinks"
+      ],
+      "evidence": "path exists only through a medium confidence edge",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "werkzeug.debug:DebuggedApplication.execute_command",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:main",
+            "detail": "click.group",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 7
+          },
+          "frames": [
+            {
+              "node": "app.cli:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "click.decorators:group",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/decorators.py",
+              "line": 6,
+              "edge": "call"
+            },
+            {
+              "node": "flask.cli:FlaskGroup.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/cli.py",
+              "line": 0,
+              "edge": "virtual"
+            },
+            {
+              "node": "flask.cli:run_command",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/cli.py",
+              "line": 510,
+              "edge": "ref"
+            },
+            {
+              "node": "werkzeug.serving:run_simple",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/serving.py",
+              "line": 923,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.debug:DebuggedApplication.__call__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/debug/__init__.py",
+              "line": 1068,
+              "edge": "ref"
+            },
+            {
+              "node": "werkzeug.debug:DebuggedApplication.execute_command",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/debug/__init__.py",
+              "line": 527,
+              "edge": "call"
+            }
+          ]
+        },
+        {
+          "sink": "werkzeug.debug:DebuggedApplication.pin_auth",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:main",
+            "detail": "click.group",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 7
+          },
+          "frames": [
+            {
+              "node": "app.cli:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "click.decorators:group",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/decorators.py",
+              "line": 6,
+              "edge": "call"
+            },
+            {
+              "node": "flask.cli:FlaskGroup.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/cli.py",
+              "line": 0,
+              "edge": "virtual"
+            },
+            {
+              "node": "flask.cli:run_command",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/cli.py",
+              "line": 510,
+              "edge": "ref"
+            },
+            {
+              "node": "werkzeug.serving:run_simple",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/serving.py",
+              "line": 923,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.debug:DebuggedApplication.__call__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/debug/__init__.py",
+              "line": 1068,
+              "edge": "ref"
+            },
+            {
+              "node": "werkzeug.debug:DebuggedApplication.pin_auth",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/debug/__init__.py",
+              "line": 517,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-cpwx-vrp4-4pq7",
+      "cve": "CVE-2025-27516",
+      "merged_ids": [
+        "PYSEC-2026-1471"
+      ],
+      "package": "jinja2",
+      "version": "3.1.2",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Jinja2 vulnerable to sandbox breakout through attr filter selecting format method",
+      "bucket": "undetermined",
+      "reason": "callback_reference",
+      "sinks": [
+        "jinja2.filters.do_attr"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the sandbox escape is in do_attr rather than in SandboxedEnvironment.getattr, which the fix did not change"
+      ],
+      "evidence": "path exists only through a medium confidence edge",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "jinja2.filters:do_attr",
+          "entrypoint": {
+            "kind": "registered_callable",
+            "node": "app.views:create_report",
+            "detail": "add_url_rule()",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+            "line": 14
+          },
+          "frames": [
+            {
+              "node": "app.views:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.render:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/render.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.environment:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/environment.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.defaults:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/defaults.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.filters:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/filters.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.filters:do_attr",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/filters.py",
+              "line": 1,
+              "edge": "ref"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-h5c8-rqwp-cp95",
+      "cve": "CVE-2024-22195",
+      "merged_ids": [
+        "PYSEC-2026-1473"
+      ],
+      "package": "jinja2",
+      "version": "3.1.2",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter",
+      "bucket": "undetermined",
+      "reason": "callback_reference",
+      "sinks": [
+        "jinja2.filters.do_xmlattr"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the filter function is the sink; it is only invoked through the template engine's filter table, never called directly by application code"
+      ],
+      "evidence": "path exists only through a medium confidence edge",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "jinja2.filters:do_xmlattr",
+          "entrypoint": {
+            "kind": "registered_callable",
+            "node": "app.views:create_report",
+            "detail": "add_url_rule()",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+            "line": 14
+          },
+          "frames": [
+            {
+              "node": "app.views:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.render:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/render.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.environment:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/environment.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.defaults:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/defaults.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.filters:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/filters.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.filters:do_xmlattr",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/filters.py",
+              "line": 1,
+              "edge": "ref"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-h75v-3vvj-5mfj",
+      "cve": "CVE-2024-34064",
+      "merged_ids": [
+        "PYSEC-2026-1474"
+      ],
+      "package": "jinja2",
+      "version": "3.1.2",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter",
+      "bucket": "undetermined",
+      "reason": "callback_reference",
+      "sinks": [
+        "jinja2.filters.do_xmlattr"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "same function as GHSA-h5c8-rqwp-cp95, which this advisory supersedes"
+      ],
+      "evidence": "path exists only through a medium confidence edge",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "jinja2.filters:do_xmlattr",
+          "entrypoint": {
+            "kind": "registered_callable",
+            "node": "app.views:create_report",
+            "detail": "add_url_rule()",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+            "line": 14
+          },
+          "frames": [
+            {
+              "node": "app.views:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.render:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/render.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/__init__.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.environment:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/environment.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.defaults:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/defaults.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.filters:<module>",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/filters.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.filters:do_xmlattr",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/filters.py",
+              "line": 1,
+              "edge": "ref"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-q2x7-8rv6-6q7h",
+      "cve": "CVE-2024-56326",
+      "merged_ids": [
+        "PYSEC-2026-1475"
+      ],
+      "package": "jinja2",
+      "version": "3.1.2",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Jinja has a sandbox breakout through indirect reference to format method",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "jinja2.sandbox.SandboxedEnvironment.getattr",
+        "jinja2.sandbox.SandboxedEnvironment.getitem",
+        "jinja2.sandbox.inspect_format_method"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "wrap_str_format is new in the fix and cannot be a sink in 3.1.2",
+        "inspect_format_method is included because its removal is the clearest marker of the flawed detection"
+      ],
+      "evidence": "getattr(..., \"getattr\") at /Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/utils.py:149",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "jinja2.sandbox:SandboxedEnvironment.getattr",
+          "entrypoint": {
+            "kind": "registered_callable",
+            "node": "app.views:create_report",
+            "detail": "add_url_rule()",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+            "line": 14
+          },
+          "frames": [
+            {
+              "node": "app.views:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+              "line": 1,
+              "edge": "entry"
+            },
+            {
+              "node": "app.render:<module>",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/render.py",
+              "line": 1,
+              "edge": "import"
+            },
+            {
+              "node": "jinja2.environment:Environment.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/environment.py",
+              "line": 5,
+              "edge": "ctor"
+            },
+            {
+              "node": "jinja2.environment:load_extensions",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/environment.py",
+              "line": 363,
+              "edge": "call"
+            },
+            {
+              "node": "jinja2.utils:import_string",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/utils.py",
+              "line": 117,
+              "edge": "call"
+            },
+            {
+              "node": "jinja2.sandbox:SandboxedEnvironment.getattr",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/jinja2/3.1.2/src/jinja2/sandbox.py",
+              "line": 149,
+              "edge": "dynamic"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-27jp-wm6q-gp25",
+      "cve": "",
+      "merged_ids": [],
+      "package": "sqlparse",
+      "version": "0.4.4",
+      "direct": true,
+      "severity": "moderate",
+      "summary": "sqlparse: formatting list of tuples leads to denial of service",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "sqlparse.engine.grouping._group_matching",
+        "sqlparse.engine.grouping._group"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the unbounded recursion is in the two modified helpers rather than in group() which calls them",
+        "both helpers are private, so a caller-level sink would be sqlparse.engine.grouping.group"
+      ],
+      "evidence": "unresolved call .run() at /Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/__init__.py:59",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "sqlparse.engine.grouping:_group_matching",
+          "entrypoint": {
+            "kind": "registered_callable",
+            "node": "app.views:export_report",
+            "detail": "add_url_rule()",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+            "line": 21
+          },
+          "frames": [
+            {
+              "node": "app.views:export_report",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/views.py",
+              "line": 21,
+              "edge": "entry"
+            },
+            {
+              "node": "app.plugins:export",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/plugins.py",
+              "line": 23,
+              "edge": "call"
+            },
+            {
+              "node": "app.exporters.csv_exporter:export",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/exporters/csv_exporter.py",
+              "line": 15,
+              "edge": "dynamic"
+            },
+            {
+              "node": "sqlparse:format",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/__init__.py",
+              "line": 6,
+              "edge": "call"
+            },
+            {
+              "node": "sqlparse.engine.filter_stack:FilterStack.run",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/engine/filter_stack.py",
+              "line": 59,
+              "edge": "dynamic"
+            },
+            {
+              "node": "sqlparse.engine.grouping:group",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/engine/grouping.py",
+              "line": 36,
+              "edge": "call"
+            },
+            {
+              "node": "sqlparse.engine.grouping:group_brackets",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/engine/grouping.py",
+              "line": 397,
+              "edge": "ref"
+            },
+            {
+              "node": "sqlparse.engine.grouping:_group_matching",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/engine/grouping.py",
+              "line": 53,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-3496-9g83-7v6x",
+      "cve": "CVE-2026-59894",
+      "merged_ids": [],
+      "package": "sqlparse",
+      "version": "0.4.4",
+      "direct": true,
+      "severity": "moderate",
+      "summary": "sqlparse: Generated Python and PHP snippets allow SQL string breakout through unescaped backslashes",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "sqlparse.filters.output.OutputPythonFilter._process",
+        "sqlparse.filters.output.OutputPHPFilter._process"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes both output filters are separate sinks rather than one shared helper"
+      ],
+      "evidence": "name match only, unresolved call .process() at /Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/parser.py:449",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "sqlparse.filters.output:OutputPythonFilter._process",
+          "entrypoint": {
+            "kind": "app_factory",
+            "node": "app:create_app",
+            "detail": "app:create_app",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+            "line": 6
+          },
+          "frames": [
+            {
+              "node": "app:create_app",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+              "line": 6,
+              "edge": "entry"
+            },
+            {
+              "node": "flask.app:Flask.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 7,
+              "edge": "ctor"
+            },
+            {
+              "node": "flask.scaffold:Scaffold.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/scaffold.py",
+              "line": 367,
+              "edge": "call"
+            },
+            {
+              "node": "click.core:BaseCommand.__call__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/core.py",
+              "line": 109,
+              "edge": "ref"
+            },
+            {
+              "node": "click.core:BaseCommand.main",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/core.py",
+              "line": 1130,
+              "edge": "call"
+            },
+            {
+              "node": "click.core:BaseCommand.make_context",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/core.py",
+              "line": 1054,
+              "edge": "call"
+            },
+            {
+              "node": "click.core:Command.parse_args",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/core.py",
+              "line": 0,
+              "edge": "virtual"
+            },
+            {
+              "node": "click.parser:OptionParser.parse_args",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/parser.py",
+              "line": 1375,
+              "edge": "dynamic"
+            },
+            {
+              "node": "click.parser:OptionParser._process_args_for_options",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/parser.py",
+              "line": 337,
+              "edge": "call"
+            },
+            {
+              "node": "click.parser:OptionParser._process_opts",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/parser.py",
+              "line": 364,
+              "edge": "call"
+            },
+            {
+              "node": "click.parser:OptionParser._match_short_opt",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/click/8.1.3/src/click/parser.py",
+              "line": 523,
+              "edge": "call"
+            },
+            {
+              "node": "sqlparse.filters.output:OutputFilter.process",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/filters/output.py",
+              "line": 449,
+              "edge": "dynamic"
+            },
+            {
+              "node": "sqlparse.filters.output:OutputPythonFilter._process",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/sqlparse/0.4.4/src/sqlparse/filters/output.py",
+              "line": 0,
+              "edge": "virtual"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-29vq-49wr-vm6x",
+      "cve": "CVE-2026-27199",
+      "merged_ids": [
+        "PYSEC-2026-2320"
+      ],
+      "package": "werkzeug",
+      "version": "2.3.3",
+      "direct": false,
+      "severity": "moderate",
+      "summary": " Werkzeug safe_join() allows Windows special device names",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "werkzeug.security.safe_join"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the flaw is in safe_join itself and not in send_from_directory, which is the caller the advisory describes"
+      ],
+      "evidence": "unresolved call .send_static_file() at /Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py:502",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "werkzeug.security:safe_join",
+          "entrypoint": {
+            "kind": "app_factory",
+            "node": "app:create_app",
+            "detail": "app:create_app",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+            "line": 6
+          },
+          "frames": [
+            {
+              "node": "app:create_app",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+              "line": 6,
+              "edge": "entry"
+            },
+            {
+              "node": "flask.app:Flask.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 7,
+              "edge": "ctor"
+            },
+            {
+              "node": "flask.scaffold:Scaffold.send_static_file",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/scaffold.py",
+              "line": 502,
+              "edge": "dynamic"
+            },
+            {
+              "node": "flask.helpers:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/helpers.py",
+              "line": 318,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.utils:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/utils.py",
+              "line": 557,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.security:safe_join",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/security.py",
+              "line": 567,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-87hc-h4r5-73f7",
+      "cve": "CVE-2026-21860",
+      "merged_ids": [
+        "PYSEC-2026-2044"
+      ],
+      "package": "werkzeug",
+      "version": "2.3.3",
+      "direct": false,
+      "severity": "moderate",
+      "summary": " Werkzeug safe_join() allows Windows special device names with compound extensions",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "werkzeug.security.safe_join"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the flaw is in safe_join rather than in send_from_directory, its caller",
+        "the set _windows_device_files is a module level constant and cannot be named as a function sink"
+      ],
+      "evidence": "unresolved call .send_static_file() at /Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py:502",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "werkzeug.security:safe_join",
+          "entrypoint": {
+            "kind": "app_factory",
+            "node": "app:create_app",
+            "detail": "app:create_app",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+            "line": 6
+          },
+          "frames": [
+            {
+              "node": "app:create_app",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+              "line": 6,
+              "edge": "entry"
+            },
+            {
+              "node": "flask.app:Flask.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 7,
+              "edge": "ctor"
+            },
+            {
+              "node": "flask.scaffold:Scaffold.send_static_file",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/scaffold.py",
+              "line": 502,
+              "edge": "dynamic"
+            },
+            {
+              "node": "flask.helpers:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/helpers.py",
+              "line": 318,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.utils:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/utils.py",
+              "line": 557,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.security:safe_join",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/security.py",
+              "line": 567,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-f9vj-2wh5-fj8j",
+      "cve": "CVE-2024-49766",
+      "merged_ids": [
+        "PYSEC-2026-2045"
+      ],
+      "package": "werkzeug",
+      "version": "2.3.3",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Werkzeug safe_join not safe on Windows",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "werkzeug.security.safe_join"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the flaw is in safe_join rather than in send_from_directory, its caller"
+      ],
+      "evidence": "unresolved call .send_static_file() at /Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py:502",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "werkzeug.security:safe_join",
+          "entrypoint": {
+            "kind": "app_factory",
+            "node": "app:create_app",
+            "detail": "app:create_app",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+            "line": 6
+          },
+          "frames": [
+            {
+              "node": "app:create_app",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+              "line": 6,
+              "edge": "entry"
+            },
+            {
+              "node": "flask.app:Flask.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 7,
+              "edge": "ctor"
+            },
+            {
+              "node": "flask.scaffold:Scaffold.send_static_file",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/scaffold.py",
+              "line": 502,
+              "edge": "dynamic"
+            },
+            {
+              "node": "flask.helpers:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/helpers.py",
+              "line": 318,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.utils:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/utils.py",
+              "line": 557,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.security:safe_join",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/security.py",
+              "line": 567,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-hgf8-39gv-g3f2",
+      "cve": "CVE-2025-66221",
+      "merged_ids": [
+        "PYSEC-2026-2046"
+      ],
+      "package": "werkzeug",
+      "version": "2.3.3",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Werkzeug safe_join() allows Windows special device names",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "werkzeug.security.safe_join"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the flaw is in safe_join rather than in send_from_directory, its caller"
+      ],
+      "evidence": "unresolved call .send_static_file() at /Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py:502",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "werkzeug.security:safe_join",
+          "entrypoint": {
+            "kind": "app_factory",
+            "node": "app:create_app",
+            "detail": "app:create_app",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+            "line": 6
+          },
+          "frames": [
+            {
+              "node": "app:create_app",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+              "line": 6,
+              "edge": "entry"
+            },
+            {
+              "node": "flask.app:Flask.__init__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 7,
+              "edge": "ctor"
+            },
+            {
+              "node": "flask.scaffold:Scaffold.send_static_file",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/scaffold.py",
+              "line": 502,
+              "edge": "dynamic"
+            },
+            {
+              "node": "flask.helpers:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/helpers.py",
+              "line": 318,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.utils:send_from_directory",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/utils.py",
+              "line": 557,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.security:safe_join",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/security.py",
+              "line": 567,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-hrfv-mqp8-q5rw",
+      "cve": "CVE-2023-46136",
+      "merged_ids": [
+        "PYSEC-2023-221"
+      ],
+      "package": "werkzeug",
+      "version": "2.3.3",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Werkzeug DoS: High resource usage when parsing multipart/form-data containing a large part with CR/LF character at the beginning",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "werkzeug.sansio.multipart.MultipartDecoder._parse_data"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the enclosing class is MultipartDecoder, which the hunk header does not name",
+        "werkzeug.formparser.MultiPartParser.parse is the caller and was also touched by a later commit in the same series"
+      ],
+      "evidence": "unresolved call .parse() at /Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py:274",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "werkzeug.sansio.multipart:MultipartDecoder._parse_data",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 59,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.prepare_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 575,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 486,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare_body",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 371,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:RequestEncodingMixin._encode_files",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 556,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.filepost:encode_multipart_formdata",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/filepost.py",
+              "line": 201,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.wrappers.request:Request.data",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py",
+              "line": 63,
+              "edge": "property"
+            },
+            {
+              "node": "werkzeug.wrappers.request:Request.get_data",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py",
+              "line": 376,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.wrappers.request:Request._load_form_data",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py",
+              "line": 426,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.formparser:MultiPartParser.parse",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/formparser.py",
+              "line": 274,
+              "edge": "dynamic"
+            },
+            {
+              "node": "werkzeug.sansio.multipart:MultipartDecoder.next_event",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/sansio/multipart.py",
+              "line": 499,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.sansio.multipart:MultipartDecoder._parse_data",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/sansio/multipart.py",
+              "line": 211,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-q34m-jh98-gwm2",
+      "cve": "CVE-2024-49767",
+      "merged_ids": [
+        "PYSEC-2026-3417"
+      ],
+      "package": "werkzeug",
+      "version": "2.3.3",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Werkzeug possible resource exhaustion when parsing file data in forms",
+      "bucket": "undetermined",
+      "reason": "dynamic_dispatch",
+      "sinks": [
+        "werkzeug.formparser.MultiPartParser.parse"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the werkzeug diff was not shown, so the function name was mapped from quart's parallel implementation",
+        "assumes werkzeug 2.3.3 names it MultiPartParser.parse in werkzeug.formparser"
+      ],
+      "evidence": "unresolved call .parse() at /Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py:274",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "werkzeug.formparser:MultiPartParser.parse",
+          "entrypoint": {
+            "kind": "cli_command",
+            "node": "app.cli:sync",
+            "detail": "main.command",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+            "line": 13
+          },
+          "frames": [
+            {
+              "node": "app.cli:sync",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/cli.py",
+              "line": 13,
+              "edge": "entry"
+            },
+            {
+              "node": "app.fetcher:fetch_upstream",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/fetcher.py",
+              "line": 14,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:get",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 5,
+              "edge": "call"
+            },
+            {
+              "node": "requests.api:request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/api.py",
+              "line": 73,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 59,
+              "edge": "call"
+            },
+            {
+              "node": "requests.sessions:Session.prepare_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/sessions.py",
+              "line": 575,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 486,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:PreparedRequest.prepare_body",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 371,
+              "edge": "call"
+            },
+            {
+              "node": "requests.models:RequestEncodingMixin._encode_files",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/requests/2.31.0/src/requests/models.py",
+              "line": 556,
+              "edge": "call"
+            },
+            {
+              "node": "urllib3.filepost:encode_multipart_formdata",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/urllib3/1.26.6/src/urllib3/filepost.py",
+              "line": 201,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.wrappers.request:Request.data",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py",
+              "line": 63,
+              "edge": "property"
+            },
+            {
+              "node": "werkzeug.wrappers.request:Request.get_data",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py",
+              "line": 376,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.wrappers.request:Request._load_form_data",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/wrappers/request.py",
+              "line": 426,
+              "edge": "call"
+            },
+            {
+              "node": "werkzeug.formparser:MultiPartParser.parse",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/werkzeug/2.3.3/src/werkzeug/formparser.py",
+              "line": 274,
+              "edge": "dynamic"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "GHSA-248v-346w-9cwc",
+      "cve": "CVE-2024-39689",
+      "merged_ids": [
+        "PYSEC-2024-230"
+      ],
+      "package": "certifi",
+      "version": "2023.7.22",
+      "direct": false,
+      "severity": "low",
+      "summary": "Certifi removes GLOBALTRUST root certificate",
+      "bucket": "undetermined",
+      "reason": "no_verified_sink",
+      "sinks": [],
+      "sink_status": "no_sink",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes a data-only change has no function-level sink, so reachability cannot be decided at function granularity for this advisory"
+      ],
+      "evidence": "no function-level sink survived patch verification",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-68rp-wp8r-4726",
+      "cve": "CVE-2026-27205",
+      "merged_ids": [
+        "PYSEC-2026-2151"
+      ],
+      "package": "flask",
+      "version": "2.3.2",
+      "direct": true,
+      "severity": "low",
+      "summary": "Flask session does not add `Vary: Cookie` header when accessed in some ways",
+      "bucket": "undetermined",
+      "reason": "callback_reference",
+      "sinks": [
+        "flask.ctx.RequestContext.push",
+        "flask.app.Flask.process_response"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the real fix is the new session property, which does not exist in the vulnerable version, so its callers were named instead",
+        "assumes push is the changed function rather than __init__ alone",
+        "the missing Vary header is emitted by SecureCookieSessionInterface.save_session, which the fix did not change"
+      ],
+      "evidence": "path exists only through a medium confidence edge",
+      "taint": null,
+      "paths": [
+        {
+          "sink": "flask.app:Flask.process_response",
+          "entrypoint": {
+            "kind": "app_factory",
+            "node": "app:create_app",
+            "detail": "app:create_app",
+            "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+            "line": 6
+          },
+          "frames": [
+            {
+              "node": "app:create_app",
+              "file": "/Users/mazenalhassan/Downloads/cyber-projects/sparrow/reachable/data/sample/app/__init__.py",
+              "line": 6,
+              "edge": "entry"
+            },
+            {
+              "node": "flask.app:Flask.__call__",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 7,
+              "edge": "ref"
+            },
+            {
+              "node": "flask.app:Flask.wsgi_app",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 2213,
+              "edge": "call"
+            },
+            {
+              "node": "flask.app:Flask.full_dispatch_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 2190,
+              "edge": "call"
+            },
+            {
+              "node": "flask.app:Flask.finalize_request",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 1487,
+              "edge": "call"
+            },
+            {
+              "node": "flask.app:Flask.process_response",
+              "file": "/Users/mazenalhassan/.cache/sparrow/pkgs/flask/2.3.2/src/flask/app.py",
+              "line": 1508,
+              "edge": "call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "advisory": "PYSEC-2025-183",
+      "cve": "CVE-2025-45768",
+      "merged_ids": [],
+      "package": "pyjwt",
+      "version": "2.4.0",
+      "direct": true,
+      "severity": "unknown",
+      "summary": "",
+      "bucket": "undetermined",
+      "reason": "no_verified_sink",
+      "sinks": [],
+      "sink_status": "no_sink",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes a disputed advisory with no fix has no sink",
+        "if a minimum key length check were added it would live in jwt.algorithms.HMACAlgorithm.prepare_key"
+      ],
+      "evidence": "no function-level sink survived patch verification",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-xgmm-8j9v-c9wx",
+      "cve": "CVE-2026-48526",
+      "merged_ids": [
+        "PYSEC-2026-179"
+      ],
+      "package": "pyjwt",
+      "version": "2.4.0",
+      "direct": true,
+      "severity": "high",
+      "summary": "PyJWT: Public-key JWK accepted as HMAC secret enables forged HS256 tokens when mixed families are allowed",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "jwt.algorithms.HMACAlgorithm.prepare_key"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the function was read from the advisory's quoted source, not from a diff",
+        "the fix may add a JWK check in from_jwk or in PyJWS.decode instead"
+      ],
+      "evidence": "jwt.algorithms is imported, prepare_key is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-2m57-hf25-phgg",
+      "cve": "CVE-2024-4340",
+      "merged_ids": [
+        "PYSEC-2026-1940"
+      ],
+      "package": "sqlparse",
+      "version": "0.4.4",
+      "direct": true,
+      "severity": "high",
+      "summary": "sqlparse parsing heavily nested list leads to Denial of Service",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "sqlparse.sql.TokenList.flatten"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the recursion depth is exhausted inside flatten, although the traceback in the advisory shows the recursion starting in grouping._group_matching and sql.group_tokens"
+      ],
+      "evidence": "sqlparse.sql is imported, flatten is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-38jv-5279-wg99",
+      "cve": "CVE-2026-21441",
+      "merged_ids": [
+        "PYSEC-2026-1996"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "high",
+      "summary": "Decompression-bomb safeguards bypassed when following HTTP redirects (streaming API)",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "urllib3.response.HTTPResponse.drain_conn"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the fix targets the 2.x tree and this pin is 1.26.6, where drain_conn exists with the same body",
+        "assumes the flaw is in drain_conn and not in the redirect handling in HTTPConnectionPool.urlopen that calls it"
+      ],
+      "evidence": "urllib3.response is imported, drain_conn is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-qccp-gfcp-xxvc",
+      "cve": "CVE-2026-44431",
+      "merged_ids": [
+        "PYSEC-2026-141"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "high",
+      "summary": "urllib3: Sensitive headers forwarded across origins in proxied low-level redirects",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "urllib3.connectionpool.HTTPConnectionPool.urlopen"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the function name was inferred from the advisory prose",
+        "the fix in 2.7.0 may add a new helper rather than change urlopen"
+      ],
+      "evidence": "urllib3.connectionpool is imported, urlopen is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-gmj6-6f8f-6699",
+      "cve": "CVE-2024-56201",
+      "merged_ids": [
+        "PYSEC-2026-1472"
+      ],
+      "package": "jinja2",
+      "version": "3.1.2",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "Jinja has a sandbox breakout through malicious filenames",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "jinja2.compiler.CodeGenerator.visit_FromImport"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "assumes the enclosing class is CodeGenerator, which the hunk header does not show"
+      ],
+      "evidence": "jinja2.compiler is imported, visit_FromImport is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-993g-76c3-p5m4",
+      "cve": "CVE-2026-48522",
+      "merged_ids": [
+        "PYSEC-2026-175"
+      ],
+      "package": "pyjwt",
+      "version": "2.4.0",
+      "direct": true,
+      "severity": "moderate",
+      "summary": "PyJWKClient: missing scheme allowlist enables CVE-2024-21643-class SSRF + token forgery via file://, ftp://, data: schemes",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "jwt.jwks_client.PyJWKClient.fetch_data"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the method name fetch_data was inferred from PyJWT's structure, not read from a diff",
+        "2.4.0 may name it differently or inline the urlopen call in get_signing_key"
+      ],
+      "evidence": "jwt.jwks_client is imported, fetch_data is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-9wx4-h78v-vm56",
+      "cve": "CVE-2024-35195",
+      "merged_ids": [
+        "PYSEC-2026-1873"
+      ],
+      "package": "requests",
+      "version": "2.31.0",
+      "direct": true,
+      "severity": "moderate",
+      "summary": "Requests `Session` object does not verify requests after making first request with verify=False",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "requests.adapters.HTTPAdapter.send"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "_get_connection and _urllib3_request_context are new in the fix, so they cannot exist in 2.31.0 and the pre-existing functions they replace were named instead",
+        "assumes get_connection in 2.31.0 is the function that ignores verify"
+      ],
+      "evidence": "requests.adapters is imported, send is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-gc5v-m9x4-r6x2",
+      "cve": "CVE-2026-25645",
+      "merged_ids": [
+        "PYSEC-2026-2275"
+      ],
+      "package": "requests",
+      "version": "2.31.0",
+      "direct": true,
+      "severity": "moderate",
+      "summary": "Requests has Insecure Temp File Reuse in its extract_zipped_paths() utility function",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "requests.utils.extract_zipped_paths"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "high",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the advisory itself says standard use of requests does not call this function"
+      ],
+      "evidence": "requests.utils is imported, extract_zipped_paths is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-g4mx-q9vg-27p4",
+      "cve": "CVE-2023-45803",
+      "merged_ids": [
+        "PYSEC-2023-212"
+      ],
+      "package": "urllib3",
+      "version": "1.26.6",
+      "direct": false,
+      "severity": "moderate",
+      "summary": "urllib3's request body not stripped after redirect from 303 status changes request method to GET",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "urllib3.connectionpool.HTTPConnectionPool.urlopen",
+        "urllib3.poolmanager.PoolManager.urlopen"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "_prepare_for_method_change is new in the fix so it cannot be the sink in 1.26.6",
+        "assumes the redirect handling that drops the body lives in urlopen in both modules",
+        "the 1.26 backport is a different commit than the 2.x one shown"
+      ],
+      "evidence": "urllib3.connectionpool is imported, urlopen is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "GHSA-fhv5-28vv-h8m8",
+      "cve": "CVE-2026-48524",
+      "merged_ids": [
+        "PYSEC-2026-177"
+      ],
+      "package": "pyjwt",
+      "version": "2.4.0",
+      "direct": true,
+      "severity": "low",
+      "summary": "PyJWKClient unbounded JWKS endpoint requests via attacker-controlled kid values (DoS)",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "jwt.jwks_client.PyJWKClient.get_signing_key",
+        "jwt.jwks_client.PyJWKClient.fetch_data"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "method names come from the advisory's line references, not from a diff",
+        "assumes 2.4.0 uses the same names, and the advisory says all versions from 2.4.0 are affected"
+      ],
+      "evidence": "jwt.jwks_client is imported, fetch_data is never called on any path",
+      "taint": null,
+      "paths": []
+    },
+    {
+      "advisory": "PYSEC-2026-2132",
+      "cve": "CVE-2026-7246",
+      "merged_ids": [],
+      "package": "click",
+      "version": "8.1.3",
+      "direct": false,
+      "severity": "unknown",
+      "summary": "",
+      "bucket": "unreachable",
+      "reason": "no_call_path",
+      "sinks": [
+        "click.termui.edit",
+        "click._termui_impl.Editor.edit_file"
+      ],
+      "sink_status": "verified",
+      "sink_confidence": "medium",
+      "sink_mode": "advisory+patch",
+      "assumptions": [
+        "the module split between click.termui and click._termui_impl was inferred from click's structure, not from a diff",
+        "the shell invocation is in Editor.edit_file, which is the more precise sink"
+      ],
+      "evidence": "click._termui_impl is imported, edit is never called on any path",
+      "taint": null,
+      "paths": []
+    }
+  ],
+  "timings": {
+    "lockfile": 0.0003948211669921875,
+    "osv": 0.559391975402832,
+    "fetch": 0.0009541511535644531,
+    "index": 0.5045440196990967,
+    "graph": 0.07329416275024414,
+    "entrypoints": 0.0005650520324707031,
+    "reachability": 0.023590803146362305
+  }
+}
