@@ -1,0 +1,489 @@
+{
+  "mode": "advisory+patch",
+  "total": 30,
+  "hits": 29,
+  "tally": {
+    "hit": 29,
+    "right_function_wrong_path": 1
+  },
+  "rows": [
+    {
+      "advisory": "GHSA-27jp-wm6q-gp25",
+      "package": "sqlparse",
+      "outcome": "hit",
+      "predicted": [
+        "sqlparse.engine.grouping._group_matching",
+        "sqlparse.engine.grouping._group"
+      ],
+      "truth": [
+        "sqlparse.engine.grouping._group",
+        "sqlparse.engine.grouping._group_matching"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-29vq-49wr-vm6x",
+      "package": "werkzeug",
+      "outcome": "hit",
+      "predicted": [
+        "werkzeug.security.safe_join"
+      ],
+      "truth": [
+        "werkzeug.security.safe_join"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-2g68-c3qc-8985",
+      "package": "werkzeug",
+      "outcome": "hit",
+      "predicted": [
+        "werkzeug.debug.DebuggedApplication.execute_command",
+        "werkzeug.debug.DebuggedApplication.debug_application",
+        "werkzeug.debug.DebuggedApplication.pin_auth",
+        "werkzeug.debug.DebuggedApplication.__call__"
+      ],
+      "truth": [
+        "werkzeug.debug.DebuggedApplication.__call__",
+        "werkzeug.debug.DebuggedApplication.__init__",
+        "werkzeug.debug.DebuggedApplication.check_host_trust",
+        "werkzeug.debug.DebuggedApplication.debug_application",
+        "werkzeug.debug.DebuggedApplication.display_console",
+        "werkzeug.debug.DebuggedApplication.execute_command",
+        "werkzeug.debug.DebuggedApplication.log_pin_request",
+        "werkzeug.debug.DebuggedApplication.pin_auth",
+        "werkzeug.sansio.utils.host_is_trusted",
+        "werkzeug.serving.run_simple"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-2h4p-vjrc-8xpq",
+      "package": "mako",
+      "outcome": "hit",
+      "predicted": [
+        "mako.lookup.TemplateLookup.get_template",
+        "mako.template.Template.__init__"
+      ],
+      "truth": [
+        "mako.lookup.TemplateLookup.get_template",
+        "mako.template.Template.__init__"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-2m57-hf25-phgg",
+      "package": "sqlparse",
+      "outcome": "hit",
+      "predicted": [
+        "sqlparse.sql.TokenList.flatten"
+      ],
+      "truth": [
+        "sqlparse.sql.TokenList.flatten"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-2qfp-q593-8484",
+      "package": "brotli",
+      "outcome": "hit",
+      "predicted": [],
+      "truth": [],
+      "confidence": "medium",
+      "mode": "advisory+patch",
+      "verified": "no_sink"
+    },
+    {
+      "advisory": "GHSA-2xpw-w6gg-jr37",
+      "package": "urllib3",
+      "outcome": "hit",
+      "predicted": [
+        "urllib3.response.HTTPResponse.read",
+        "urllib3.response.GzipDecoder.decompress",
+        "urllib3.response.DeflateDecoder.decompress"
+      ],
+      "truth": [
+        "urllib3.response.BaseHTTPResponse._decode",
+        "urllib3.response.BytesQueueBuffer.get",
+        "urllib3.response.ContentDecoder.decompress",
+        "urllib3.response.ContentDecoder.has_unconsumed_tail",
+        "urllib3.response.DeflateDecoder.__init__",
+        "urllib3.response.DeflateDecoder.decompress",
+        "urllib3.response.DeflateDecoder.has_unconsumed_tail",
+        "urllib3.response.GzipDecoder.__init__",
+        "urllib3.response.GzipDecoder.decompress",
+        "urllib3.response.GzipDecoder.has_unconsumed_tail",
+        "urllib3.response.HTTPResponse.read",
+        "urllib3.response.HTTPResponse.read1",
+        "urllib3.response.HTTPResponse.read_chunked",
+        "urllib3.response.HTTPResponse.stream",
+        "urllib3.response.MultiDecoder.decompress",
+        "urllib3.response.MultiDecoder.has_unconsumed_tail"
+      ],
+      "confidence": "medium",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-3496-9g83-7v6x",
+      "package": "sqlparse",
+      "outcome": "hit",
+      "predicted": [
+        "sqlparse.filters.output.OutputPythonFilter._process",
+        "sqlparse.filters.output.OutputPHPFilter._process"
+      ],
+      "truth": [
+        "sqlparse.filters.output.OutputPHPFilter._process",
+        "sqlparse.filters.output.OutputPythonFilter._process"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-34jh-p97f-mpxf",
+      "package": "urllib3",
+      "outcome": "hit",
+      "predicted": [
+        "urllib3.util.retry.Retry"
+      ],
+      "truth": [
+        "urllib3.util.retry.Retry"
+      ],
+      "confidence": "medium",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-38jv-5279-wg99",
+      "package": "urllib3",
+      "outcome": "hit",
+      "predicted": [
+        "urllib3.response.HTTPResponse.drain_conn"
+      ],
+      "truth": [
+        "urllib3.response.HTTPResponse.drain_conn"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-3rq5-2g8h-59hc",
+      "package": "dnspython",
+      "outcome": "right_function_wrong_path",
+      "predicted": [
+        "dns.query.udp"
+      ],
+      "truth": [
+        "dns.asyncquery.receive_udp",
+        "dns.query.receive_udp",
+        "eventlet.support.greendns.udp"
+      ],
+      "confidence": "medium",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-428g-f7cq-pgp5",
+      "package": "marshmallow",
+      "outcome": "hit",
+      "predicted": [
+        "marshmallow.error_store.merge_errors",
+        "marshmallow.error_store.ErrorStore.store_error"
+      ],
+      "truth": [
+        "marshmallow.error_store.ErrorStore.store_error",
+        "marshmallow.error_store.copy_containers",
+        "marshmallow.error_store.merge_errors"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-5239-wwwm-4pmq",
+      "package": "pygments",
+      "outcome": "hit",
+      "predicted": [
+        "pygments.lexers.archetype.AdlLexer",
+        "pygments.lexers.archetype.AtomsLexer"
+      ],
+      "truth": [
+        "pygments.lexers.archetype.AdlLexer",
+        "pygments.lexers.archetype.AtomsLexer"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-68rp-wp8r-4726",
+      "package": "flask",
+      "outcome": "hit",
+      "predicted": [
+        "flask.ctx.RequestContext.push",
+        "flask.app.Flask.process_response"
+      ],
+      "truth": [
+        "flask.app.Flask.process_response",
+        "flask.ctx.RequestContext.__init__",
+        "flask.ctx.RequestContext.copy",
+        "flask.ctx.RequestContext.push",
+        "flask.ctx.RequestContext.session",
+        "flask.sessions.SecureCookieSession.__init__",
+        "flask.sessions.SessionMixin",
+        "flask.templating._default_template_ctx_processor"
+      ],
+      "confidence": "medium",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-6vqw-3v5j-54x4",
+      "package": "cryptography",
+      "outcome": "hit",
+      "predicted": [
+        "cryptography.hazmat.backends.openssl.backend.Backend.serialize_key_and_certificates_to_pkcs12"
+      ],
+      "truth": [
+        "cryptography.hazmat.backends.openssl.backend.Backend.serialize_key_and_certificates_to_pkcs12"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-765j-9r45-w2q2",
+      "package": "flask-appbuilder",
+      "outcome": "hit",
+      "predicted": [
+        "flask_appbuilder.security.manager.BaseSecurityManager.register_views"
+      ],
+      "truth": [
+        "flask_appbuilder.security.manager.BaseSecurityManager.register_views"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-87hc-h4r5-73f7",
+      "package": "werkzeug",
+      "outcome": "hit",
+      "predicted": [
+        "werkzeug.security.safe_join"
+      ],
+      "truth": [
+        "werkzeug.security.safe_join"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-99pm-ch96-ccp2",
+      "package": "flask-appbuilder",
+      "outcome": "hit",
+      "predicted": [
+        "flask_appbuilder.utils.base.is_safe_redirect_url"
+      ],
+      "truth": [
+        "flask_appbuilder.utils.base.is_safe_redirect_url"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-9hjg-9r4m-mvj7",
+      "package": "requests",
+      "outcome": "hit",
+      "predicted": [
+        "requests.utils.get_netrc_auth"
+      ],
+      "truth": [
+        "requests.utils.get_netrc_auth"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-9wx4-h78v-vm56",
+      "package": "requests",
+      "outcome": "hit",
+      "predicted": [
+        "requests.adapters.HTTPAdapter.send",
+        "requests.adapters.HTTPAdapter.get_connection"
+      ],
+      "truth": [
+        "requests.adapters.HTTPAdapter._get_connection",
+        "requests.adapters.HTTPAdapter.send",
+        "requests.adapters._urllib3_request_context"
+      ],
+      "confidence": "medium",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-cpwx-vrp4-4pq7",
+      "package": "jinja2",
+      "outcome": "hit",
+      "predicted": [
+        "jinja2.filters.do_attr"
+      ],
+      "truth": [
+        "jinja2.filters.do_attr"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-f2ff-p2ww-7p4p",
+      "package": "sqlparse",
+      "outcome": "hit",
+      "predicted": [
+        "sqlparse.engine.grouping.group_comments"
+      ],
+      "truth": [
+        "sqlparse.engine.grouping.group_comments"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-f73w-4m7g-ch9x",
+      "package": "numexpr",
+      "outcome": "hit",
+      "predicted": [
+        "numexpr.necompiler.stringToExpression"
+      ],
+      "truth": [
+        "numexpr.necompiler.NumExpr",
+        "numexpr.necompiler.evaluate",
+        "numexpr.necompiler.re_evaluate",
+        "numexpr.necompiler.stringToExpression"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-f9vj-2wh5-fj8j",
+      "package": "werkzeug",
+      "outcome": "hit",
+      "predicted": [
+        "werkzeug.security.safe_join"
+      ],
+      "truth": [
+        "werkzeug.security.safe_join"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-fw5r-6m3x-rh7p",
+      "package": "flask-appbuilder",
+      "outcome": "hit",
+      "predicted": [
+        "flask_appbuilder.security.views.AuthDBView.login"
+      ],
+      "truth": [
+        "flask_appbuilder.security.decorators.no_cache.<locals>.wrapped_view",
+        "flask_appbuilder.security.views.AuthDBView.login",
+        "flask_appbuilder.security.views.AuthLDAPView.login",
+        "flask_appbuilder.security.views.AuthOIDView.login"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-g4mx-q9vg-27p4",
+      "package": "urllib3",
+      "outcome": "hit",
+      "predicted": [
+        "urllib3.connectionpool.HTTPConnectionPool.urlopen",
+        "urllib3.poolmanager.PoolManager.urlopen"
+      ],
+      "truth": [
+        "urllib3._collections.HTTPHeaderDict._prepare_for_method_change",
+        "urllib3.connectionpool.HTTPConnectionPool.urlopen",
+        "urllib3.poolmanager.PoolManager.urlopen"
+      ],
+      "confidence": "medium",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-gc5v-m9x4-r6x2",
+      "package": "requests",
+      "outcome": "hit",
+      "predicted": [
+        "requests.utils.extract_zipped_paths"
+      ],
+      "truth": [
+        "requests.utils.extract_zipped_paths"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-gm62-xv2j-4w53",
+      "package": "urllib3",
+      "outcome": "hit",
+      "predicted": [
+        "urllib3.response.MultiDecoder.__init__"
+      ],
+      "truth": [
+        "urllib3.response.MultiDecoder.__init__"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-gmj6-6f8f-6699",
+      "package": "jinja2",
+      "outcome": "hit",
+      "predicted": [
+        "jinja2.compiler.CodeGenerator.visit_FromImport"
+      ],
+      "truth": [
+        "jinja2.compiler.CodeGenerator.visit_FromImport"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    },
+    {
+      "advisory": "GHSA-h5c8-rqwp-cp95",
+      "package": "jinja2",
+      "outcome": "hit",
+      "predicted": [
+        "jinja2.filters.do_xmlattr"
+      ],
+      "truth": [
+        "jinja2.filters.do_xmlattr"
+      ],
+      "confidence": "high",
+      "mode": "advisory+patch",
+      "verified": "verified"
+    }
+  ]
+}

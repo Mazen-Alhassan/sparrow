@@ -1,0 +1,14 @@
+{
+  "_note": "Hand review of the mechanically derived answer key in labels.json. Each entry records a label that was wrong and why. The key is 'functions the fix commit changed', which is a proxy for 'the vulnerable function', and this file is where that proxy is corrected.",
+  "GHSA-2qfp-q593-8484": {
+    "truth": [],
+    "reason": "The advisory is filed against the brotli package, but both linked commits are in google/brotli's C sources and in scrapy. The answer key picked up scrapy functions, which are not in the brotli package at all. The correct answer for brotli is that no Python function in it is the flaw."
+  },
+  "_reviewed_and_kept": {
+    "GHSA-2xpw-w6gg-jr37": "The fix targets urllib3 2.x and the pin is 1.26.6, so some key functions do not exist in the pinned version. Kept: the task is to name a function the patch changed.",
+    "GHSA-g4mx-q9vg-27p4": "Same 2.x versus 1.26 mismatch. _prepare_for_method_change is new in the fix and cannot exist in 1.26.6.",
+    "GHSA-3rq5-2g8h-59hc": "Two projects in the key, eventlet and dnspython, because the advisory links both. Both are legitimate.",
+    "GHSA-2g68-c3qc-8985": "Ten functions because the werkzeug debugger fix landed across two commits. All are genuinely part of the fix.",
+    "GHSA-f73w-4m7g-ch9x": "numexpr.necompiler.evaluate and re_evaluate appear because the commit also touched their bodies. stringToExpression is the flaw."
+  }
+}
