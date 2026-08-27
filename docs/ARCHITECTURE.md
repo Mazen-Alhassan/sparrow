@@ -222,8 +222,8 @@ middle column and a longer README section.
 
 ## Changes the adversary forced
 
-The design above is what the architect specified. These are the parts that only exist because the
-adversary agent broke the original resolver on ten sample applications, all of which were reported
+The design above is what was specified up front. These are the parts that only exist because the
+adversarial pass broke the original resolver on ten sample applications, all of which were reported
 `unreachable` while provably executing their sink. The full report is `tests/adversarial/RESULTS.md`.
 
 | Construct | Mechanism added |

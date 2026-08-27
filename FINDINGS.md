@@ -431,9 +431,9 @@ would put most of the dependency tree in the undetermined bucket and mean nothin
 
 ## 5. What the adversary found
 
-The `adversary` agent was told that finding a flaw is the success condition, and that a case only
-counts when the sink provably executes and the tool says `unreachable`. It wrote ten applications.
-Its report is [`tests/adversarial/RESULTS.md`](tests/adversarial/RESULTS.md), written before any fix.
+The rule for this pass was that finding a flaw is the success condition, and that a case only counts
+when the sink provably executes and the tool still says `unreachable`. Ten applications came out of
+it. The report is [`tests/adversarial/RESULTS.md`](tests/adversarial/RESULTS.md), written before any fix.
 
 **First pass: 10 hits out of 10 cases.** Every construct it tried produced a confident `unreachable`
 for a function that printed `SINK EXECUTED` on every run.
