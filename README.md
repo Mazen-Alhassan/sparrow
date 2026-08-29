@@ -19,6 +19,8 @@ make test
 
 ![demo](docs/demo.gif)
 
+`pip install -e .` also installs a `sparrow` console script, so `sparrow scan ...` works in place of `python -m src.cli scan ...`.
+
 ## What it does
 
 - Reads a pinned lockfile and asks OSV which exact versions are affected
