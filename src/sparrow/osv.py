@@ -89,7 +89,14 @@ def query_batch(packages, cache: Path = DEFAULT_CACHE, offline: bool = False) ->
     hits: dict[str, list[str]] = {}
     for start in range(0, len(queries), 100):
         chunk = queries[start : start + 100]
-        result = _post(QUERYBATCH, {"queries": chunk})
+        try:
+            result = _post(QUERYBATCH, {"queries": chunk})
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+            # This is the first network call a run makes, so a DNS failure or an outage otherwise
+            # surfaces as a bare urllib traceback instead of telling the user what actually failed.
+            raise RuntimeError(
+                f"could not reach OSV.dev ({exc}); use --offline with a cached query to skip it"
+            ) from exc
         for query, row in zip(chunk, result.get("results", [])):
             ids = [v["id"] for v in row.get("vulns", [])]
             if ids:
