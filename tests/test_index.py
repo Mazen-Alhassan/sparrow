@@ -13,6 +13,23 @@ def test_module_names_from_paths(tmp_path):
     assert module_name_for(tmp_path / "pkg" / "sub" / "mod.py", tmp_path) == "pkg.sub.mod"
 
 
+def test_module_names_for_digit_led_migration_files(tmp_path):
+    (tmp_path / "migrations").mkdir()
+    (tmp_path / "migrations" / "0001_initial.py").write_text("")
+    assert module_name_for(tmp_path / "migrations" / "0001_initial.py", tmp_path) == \
+        "migrations._0001_initial"
+
+
+def test_digit_led_migration_calls_are_indexed(tree):
+    root = tree({
+        "migrations/0001_initial.py": "import vuln\n\ndef upgrade():\n    vuln.bad()\n",
+    })
+    index, graph = build(root)
+    assert "migrations._0001_initial" in index.modules
+    calls = index.modules["migrations._0001_initial"].scopes["upgrade"].calls
+    assert any(c.target == "vuln.bad" for c in calls)
+
+
 def test_relative_imports_resolve(tree):
     root = tree({
         "pkg/__init__.py": "",

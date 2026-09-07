@@ -516,7 +516,14 @@ def module_name_for(path: Path, root: Path) -> str | None:
         parts[-1] = parts[-1][:-3]
     else:
         return None
-    if not parts or any(not p.isidentifier() for p in parts):
+    if not parts:
+        return None
+    # Alembic revisions and Django migrations are named like `0001_initial.py` or a bare hex
+    # revision id, which start with a digit and are not valid identifiers. They are loaded by
+    # file path rather than import, so this name is synthetic, but it still lets the indexer
+    # see the calls a migration makes instead of silently dropping the file.
+    parts = [f"_{p}" if p and p[0].isdigit() else p for p in parts]
+    if any(not p.isidentifier() for p in parts):
         return None
     return ".".join(parts)
 
