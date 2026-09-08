@@ -487,9 +487,10 @@ noise as a report.
 **Two constructs were never tried.** The adversary did not attempt C extension callbacks or
 `sys.settrace`, and neither is modelled.
 
-Separately, and not from the adversary: Superset's 293 alembic migration files are not indexed at all,
-because their filenames start with a date and are not valid Python module names. Alembic loads them by
-path. Any vulnerability reachable only from a migration is invisible to this tool.
+Separately, and not from the adversary: Superset's 293 alembic migration files are indexed now —
+their filenames start with a date, which made them invalid Python module names, and that's fixed —
+but alembic still loads and calls them by path rather than by import, so nothing in the call graph
+reaches them. Any vulnerability reachable only from a migration is still invisible to this tool.
 
 ---
 
