@@ -42,6 +42,16 @@ REASON_TEXT = {
     "virtual_dispatch": "only through a subclass override",
 }
 
+SARIF_LEVEL = {REACHABLE: "error", UNDETERMINED: "warning", UNREACHABLE: "note"}
+
+
+def shorten_path(path: str, roots: list[str]) -> str:
+    for root in roots:
+        if path.startswith(root):
+            return path[len(root):].lstrip("/")
+    parts = Path(path).parts
+    return "/".join(parts[-3:]) if len(parts) > 3 else path
+
 
 def _colour_enabled(stream) -> bool:
     if os.environ.get("NO_COLOR"):
@@ -112,11 +122,7 @@ class Renderer:
             self._finding(finding, results["target"]["roots"])
 
     def _shorten(self, path: str, roots: list[str]) -> str:
-        for root in roots:
-            if path.startswith(root):
-                return path[len(root):].lstrip("/")
-        parts = Path(path).parts
-        return "/".join(parts[-3:]) if len(parts) > 3 else path
+        return shorten_path(path, roots)
 
     def _finding(self, finding: dict, roots: list[str]) -> None:
         name = finding["cve"] or finding["advisory"]
@@ -192,3 +198,56 @@ def render(results: dict, stream=None, show: str = "reachable", limit: int = 0) 
 def write_json(results: dict, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(results, indent=2, sort_keys=False) + "\n")
+
+
+def to_sarif(results: dict) -> dict:
+    """SARIF 2.1.0, so a run's findings upload straight to GitHub code scanning.
+
+    Only the fields an alert reader actually looks at are populated: a rule per advisory, a level
+    from the same three buckets the terminal report uses, and a location when a call path pins one
+    down. Findings with no path (most of `undetermined`, all of `unreachable`) get a rule and a
+    message but no location, which SARIF allows.
+    """
+    roots = results["target"]["roots"]
+    rules: dict[str, dict] = {}
+    sarif_results = []
+    for finding in results["findings"]:
+        rule_id = finding["cve"] or finding["advisory"]
+        rules.setdefault(rule_id, {
+            "id": rule_id,
+            "name": finding["advisory"],
+            "shortDescription": {"text": finding["summary"] or finding["advisory"]},
+        })
+        result = {
+            "ruleId": rule_id,
+            "level": SARIF_LEVEL[finding["bucket"]],
+            "message": {"text": f"{finding['package']} {finding['version']}: "
+                                f"{finding['summary'] or finding['advisory']} ({finding['bucket']})"},
+        }
+        frames = finding["paths"][0]["frames"] if finding.get("paths") else []
+        sink = frames[-1] if frames else None
+        if sink and sink["file"] and sink["file"] != "<unknown>":
+            result["locations"] = [{
+                "physicalLocation": {
+                    "artifactLocation": {"uri": shorten_path(sink["file"], roots)},
+                    "region": {"startLine": max(sink["line"], 1)},
+                },
+            }]
+        sarif_results.append(result)
+    return {
+        "version": "2.1.0",
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "runs": [{
+            "tool": {"driver": {
+                "name": "sparrow",
+                "informationUri": "https://github.com/",
+                "rules": list(rules.values()),
+            }},
+            "results": sarif_results,
+        }],
+    }
+
+
+def write_sarif(results: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(to_sarif(results), indent=2) + "\n")

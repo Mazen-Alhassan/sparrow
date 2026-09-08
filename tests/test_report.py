@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 import json
 
-from src.sparrow.report import Renderer, _colour_enabled, write_json
+from src.sparrow.report import Renderer, _colour_enabled, to_sarif, write_json
 
 
 def test_no_color_env_wins_even_on_a_tty(monkeypatch):
@@ -52,3 +52,44 @@ def test_write_json_round_trips_and_creates_parent_dirs(tmp_path):
     results = {"target": {"name": "demo"}, "counts": {"reachable": 1}}
     write_json(results, out)
     assert json.loads(out.read_text()) == results
+
+
+def _sarif_results():
+    return {
+        "target": {"name": "demo", "roots": ["/app"]},
+        "findings": [
+            {
+                "advisory": "GHSA-aaaa", "cve": "CVE-2026-1", "package": "flask", "version": "1.0",
+                "summary": "bad thing", "bucket": "reachable",
+                "paths": [{"frames": [{"node": "x:y", "file": "/app/x.py", "line": 12, "edge": "entry"}]}],
+            },
+            {
+                "advisory": "GHSA-bbbb", "cve": "", "package": "click", "version": "2.0",
+                "summary": "unused thing", "bucket": "unreachable", "paths": [],
+            },
+        ],
+    }
+
+
+def test_to_sarif_maps_bucket_to_level_and_locates_the_sink():
+    sarif = to_sarif(_sarif_results())
+    assert sarif["version"] == "2.1.0"
+    results = sarif["runs"][0]["results"]
+    reachable = next(r for r in results if r["ruleId"] == "CVE-2026-1")
+    assert reachable["level"] == "error"
+    assert reachable["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == "x.py"
+    assert reachable["locations"][0]["physicalLocation"]["region"]["startLine"] == 12
+
+
+def test_to_sarif_falls_back_to_advisory_id_and_skips_location_with_no_path():
+    sarif = to_sarif(_sarif_results())
+    results = sarif["runs"][0]["results"]
+    unreachable = next(r for r in results if r["ruleId"] == "GHSA-bbbb")
+    assert unreachable["level"] == "note"
+    assert "locations" not in unreachable
+
+
+def test_to_sarif_lists_one_rule_per_advisory():
+    sarif = to_sarif(_sarif_results())
+    rule_ids = {rule["id"] for rule in sarif["runs"][0]["tool"]["driver"]["rules"]}
+    assert rule_ids == {"CVE-2026-1", "GHSA-bbbb"}
