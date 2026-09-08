@@ -200,7 +200,12 @@ def scan(args) -> int:
     }
     out = Path(args.out).resolve()
     report.write_json(results, out)
-    _log(args, f"[7/7] wrote {_relative(out)}")
+    if args.sarif:
+        sarif_out = Path(args.sarif).resolve()
+        report.write_sarif(results, sarif_out)
+        _log(args, f"[7/7] wrote {_relative(out)} and {_relative(sarif_out)}")
+    else:
+        _log(args, f"[7/7] wrote {_relative(out)}")
     report.render(results, show=args.show, limit=args.limit)
     code = _exit_code(args.fail_on, counts)
     if code:
@@ -265,6 +270,7 @@ def main(argv=None) -> int:
     scan_parser = sub.add_parser("scan", help="run the full analysis")
     common(scan_parser)
     scan_parser.add_argument("--out", default="data/results.json")
+    scan_parser.add_argument("--sarif", help="also write SARIF for GitHub code scanning")
     scan_parser.add_argument("--name", help="display name for the target")
     scan_parser.add_argument("--show", default="reachable", choices=["reachable", "undetermined", "all"])
     scan_parser.add_argument("--limit", type=int, default=0)
