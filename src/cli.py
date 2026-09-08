@@ -3,6 +3,7 @@
     python -m src.cli scan    --target data/sample --out data/results.json
     python -m src.cli prompts --target data/sample --out data/prompts --mode advisory-only
     python -m src.cli verify  --target data/sample
+    python -m src.cli diff    old-results.json new-results.json
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from .sparrow import deps, fetch, osv, report
+from .sparrow import deps, diff, fetch, osv, report
 from .sparrow.callgraph import CallGraph
 from .sparrow.entrypoints import discover as discover_entrypoints
 from .sparrow.index import Index
@@ -251,6 +252,14 @@ def verify_cmd(args) -> int:
     return 0
 
 
+def diff_cmd(args) -> int:
+    old = json.loads(Path(args.old).read_text())
+    new = json.loads(Path(args.new).read_text())
+    rows = diff.compare(old, new)
+    print(diff.render(rows))
+    return 1 if any(row["change"] == "regressed" for row in rows) else 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="sparrow", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -286,6 +295,11 @@ def main(argv=None) -> int:
     common(verify_parser)
     verify_parser.add_argument("--force", action="store_true")
     verify_parser.set_defaults(func=verify_cmd)
+
+    diff_parser = sub.add_parser("diff", help="compare two scan results by advisory bucket")
+    diff_parser.add_argument("old", help="earlier scan --out file")
+    diff_parser.add_argument("new", help="later scan --out file")
+    diff_parser.set_defaults(func=diff_cmd)
 
     args = parser.parse_args(argv)
     return args.func(args)
