@@ -80,6 +80,56 @@ urlpatterns = [("", index), ("r", ReportView.as_view())]
     assert ("django_url", "site.views:ReportView.get") in found
 
 
+def test_fastapi_lifespan_and_router_are_entry_points(tree):
+    root = tree({
+        "svc/__init__.py": "",
+        "svc/app.py": """
+from fastapi import APIRouter, FastAPI
+
+router = APIRouter()
+
+@router.get("/x")
+def handler():
+    return 1
+
+async def lifespan(app):
+    yield
+
+app = FastAPI(lifespan=lifespan)
+""",
+    })
+    _, _, entries, _ = analyse(root)
+    found = kinds(entries)
+    assert ("http_route", "svc.app:handler") in found
+    assert ("registered_callable", "svc.app:lifespan") in found
+
+
+def test_django_admin_register_call_and_decorator(tree):
+    root = tree({
+        "site/__init__.py": "",
+        "site/models.py": "class Author:\n    pass\n",
+        "site/admin.py": """
+from django.contrib import admin
+from site.models import Author
+
+class AuthorAdmin:
+    def save_model(self, request, obj, form, change):
+        return 1
+
+admin.site.register(Author, AuthorAdmin)
+
+@admin.register(Author)
+class OtherAdmin:
+    def get_queryset(self, request):
+        return 1
+""",
+    })
+    _, _, entries, _ = analyse(root)
+    found = kinds(entries)
+    assert ("django_admin", "site.admin:AuthorAdmin.save_model") in found
+    assert ("django_admin", "site.admin:OtherAdmin.get_queryset") in found
+
+
 def test_tests_are_excluded_by_default(tree):
     root = tree({
         "tests/__init__.py": "",
