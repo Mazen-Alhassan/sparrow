@@ -17,6 +17,7 @@ from pathlib import Path
 from .sparrow import deps, diff, fetch, osv, report
 from .sparrow.callgraph import CallGraph
 from .sparrow.entrypoints import discover as discover_entrypoints
+from .sparrow.index import DEFAULT_CACHE as AST_CACHE
 from .sparrow.index import Index
 from .sparrow.reach import REACHABLE, UNDETERMINED, UNREACHABLE, Analyzer
 from .sparrow.sinks import extract, verify
@@ -85,10 +86,10 @@ def scan(args) -> int:
     index = Index()
     roots = [root] + ([root / "src"] if (root / "src").is_dir() else [])
     for app_root in roots:
-        index.add_root(app_root, is_app=True)
+        index.add_root(app_root, is_app=True, cache=AST_CACHE)
     for package in unpacked:
         for source in fetch.source_dirs(package):
-            index.add_root(source, package=package.name)
+            index.add_root(source, package=package.name, cache=AST_CACHE)
     _log(args, f"[4/7] index: {index.stats()['modules']} modules, {index.stats()['scopes']} functions, "
                f"{index.stats()['parse_errors']} parse errors")
     timer.mark("index")

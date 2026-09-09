@@ -9,6 +9,8 @@ markers is the tool's honesty budget.
 from __future__ import annotations
 
 import ast
+import hashlib
+import pickle
 import re
 import warnings
 from dataclasses import dataclass, field
@@ -555,6 +557,44 @@ def is_dev_module(name: str) -> bool:
             or name in ("setup", "conftest", "noxfile"))
 
 
+DEFAULT_CACHE = Path.home() / ".cache" / "sparrow" / "ast_index"
+
+
+def _cache_key(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _load_cached(cache_file: Path, name: str, file: str, root: str, package: str,
+                  is_app: bool) -> ModuleInfo | None:
+    """A cache hit skips the AST walk entirely: identical bytes always index the same way, so
+    the only thing that needs patching back in is wherever this run found the file on disk.
+    """
+    try:
+        with cache_file.open("rb") as fh:
+            info = pickle.load(fh)
+    except (pickle.UnpicklingError, EOFError, OSError, AttributeError, TypeError,
+             ValueError, ImportError, ModuleNotFoundError):
+        return None
+    if not isinstance(info, ModuleInfo) or info.name != name:
+        return None
+    info.file = file
+    info.root = root
+    info.package = package
+    info.is_app = is_app
+    for scope in info.scopes.values():
+        scope.file = file
+    return info
+
+
+def _save_cached(cache_file: Path, info: ModuleInfo) -> None:
+    try:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        with cache_file.open("wb") as fh:
+            pickle.dump(info, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    except OSError:
+        pass   # a cold cache costs time, not correctness
+
+
 class Index:
     def __init__(self) -> None:
         self.modules: dict[str, ModuleInfo] = {}
@@ -563,7 +603,7 @@ class Index:
         self.file_count = 0
 
     def add_root(self, root: Path, package: str = "", is_app: bool = False,
-                 skip_tests: bool = False) -> int:
+                 skip_tests: bool = False, cache: Path | None = None) -> int:
         root = root.resolve()
         added = 0
         self.native |= native_modules(root)
@@ -576,14 +616,23 @@ class Index:
             if name is None or name in self.modules:
                 continue
             self.file_count += 1
+            # Old packages are full of invalid escape sequences. They parse fine and the warnings
+            # would drown the run's own output.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                text = path.read_text(encoding="utf-8", errors="replace")
+            cache_file = cache / f"{_cache_key(text)}.pkl" if cache is not None else None
+            info = (_load_cached(cache_file, name, str(path), str(root), package, is_app)
+                    if cache_file is not None and cache_file.exists() else None)
+            if info is not None:
+                self.modules[name] = info
+                added += 1
+                continue
             info = ModuleInfo(name=name, file=str(path), root=str(root), package=package, is_app=is_app)
             try:
                 with warnings.catch_warnings():
-                    # Old packages are full of invalid escape sequences. They parse fine and the
-                    # warnings would drown the run's own output.
                     warnings.simplefilter("ignore")
-                    tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"),
-                                     filename=str(path))
+                    tree = ast.parse(text, filename=str(path))
             except (SyntaxError, ValueError, RecursionError) as exc:
                 info.parse_error = f"{type(exc).__name__}: {exc}"
                 self.errors.append((name, info.parse_error))
@@ -596,6 +645,8 @@ class Index:
             except RecursionError:
                 info.parse_error = "RecursionError while walking"
                 self.errors.append((name, info.parse_error))
+            if cache_file is not None and not info.parse_error:
+                _save_cached(cache_file, info)
             self.modules[name] = info
             added += 1
         for name in self.native:
