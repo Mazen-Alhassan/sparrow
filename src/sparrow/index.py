@@ -45,9 +45,11 @@ _NATIVE_SUFFIX = re.compile(r"\.(cpython-[^.]+|abi3|pypy[^.]*)?\.?(so|pyd|dylib)
 
 # Calls that register a callable with a framework. The keyword arguments of these are kept so a
 # route registered by `app.add_url_rule("/x", view_func=handler)` is found as an entry point.
+# `FastAPI`/`Starlette` belong here too: `FastAPI(lifespan=mgr, on_startup=[boot])` hands the ASGI
+# server callables it calls itself, on the same footing as a decorator or an `add_url_rule` call.
 REGISTRARS = {"add_url_rule", "add_route", "add_api_route", "add_command", "add_handler",
               "connect", "subscribe", "register", "add_periodic_task", "add_websocket_route",
-              "add_view", "register_view", "add_resource"}
+              "add_view", "register_view", "add_resource", "FastAPI", "Starlette"}
 
 
 @dataclass(slots=True)

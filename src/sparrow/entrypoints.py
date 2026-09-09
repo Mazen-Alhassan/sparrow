@@ -27,6 +27,14 @@ TASK_DECORATORS = re.compile(r"(^|\.)(task|shared_task|periodic_task|celery_task
 CLI_DECORATORS = re.compile(r"(^|\.)(command|group|cli)$")
 SIGNAL_DECORATORS = re.compile(r"(^|\.)(receiver|connect|listens_for|on_event|before_request|"
                                r"after_request|teardown_request|errorhandler|hookimpl)$")
+ADMIN_REGISTER = re.compile(r"(^|\.)register$")
+# Hooks the Django admin site calls on a registered ModelAdmin while serving a request. Not every
+# subclass overrides all of these, so only the ones actually defined are added.
+ADMIN_HOOKS = ("save_model", "delete_model", "save_formset", "delete_queryset", "get_queryset",
+               "has_add_permission", "has_change_permission", "has_delete_permission",
+               "has_view_permission", "get_urls", "changelist_view", "response_add",
+               "response_change", "formfield_for_foreignkey", "formfield_for_manytomany",
+               "lookup_allowed", "get_actions")
 # Reachability that runs only through repository tooling is real, but it is not production
 # reachability, and conflating the two inflates the number a reader is asked to act on.
 
@@ -96,6 +104,7 @@ def discover(index: Index, graph: CallGraph, target_root: Path,
     _django_urls(index, graph, app_modules, add)
     _entry_point_metadata(index, graph, target_root, add)
     _as_view_calls(index, graph, app_modules, add)
+    _django_admin(index, graph, app_modules, add)
 
     if include_tests:
         for module in index.modules.values():
@@ -181,6 +190,35 @@ def _as_view_calls(index: Index, graph: CallGraph, app_modules, add) -> None:
                     for name in ("get", "post", "put", "delete", "dispatch"):
                         if info and name in info.methods:
                             add("django_url", f"{class_module}:{info.methods[name]}", "as_view")
+
+
+def _django_admin(index: Index, graph: CallGraph, app_modules, add) -> None:
+    """`admin.site.register(Model, ModelAdmin)` and `@admin.register(Model)` hand a ModelAdmin
+    class to the Django admin site, which calls its hooks directly on every admin request.
+    """
+    def mark(class_node: str, detail: str) -> None:
+        class_module, qual = class_node.split(":", 1)
+        info = index.modules[class_module].classes.get(qual)
+        if info is None:
+            return
+        for name in ADMIN_HOOKS:
+            if name in info.methods:
+                add("django_admin", f"{class_module}:{info.methods[name]}", f"{detail}.{name}")
+
+    for module in app_modules:
+        for scope in module.scopes.values():
+            for call in scope.calls:
+                # `register` alone is too common a method name to key off of; requiring "admin"
+                # somewhere in the dotted call target is what keeps this to actual admin sites.
+                if call.attr != "register" or "admin" not in (call.target or "").split("."):
+                    continue
+                for name in call.args:
+                    resolved = graph.resolve_in_module(name, module, scope)
+                    if resolved and resolved[0] == "class":
+                        mark(resolved[1], "admin.site.register()")
+        for qualname, info in module.classes.items():
+            if any(d.split(".")[0] == "admin" and ADMIN_REGISTER.search(d) for d in info.decorators if d):
+                mark(info.node_id, "admin.register")
 
 
 def _record_target(index: Index, graph: CallGraph, target: str, kind: str, detail: str, add) -> None:
