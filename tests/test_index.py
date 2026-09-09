@@ -2,6 +2,7 @@ from pathlib import Path
 
 from conftest import build
 
+from src.sparrow import index as index_mod
 from src.sparrow.index import Index, module_name_for, native_modules
 
 
@@ -91,6 +92,42 @@ def test_native_module_detection(tmp_path):
     index = Index()
     index.add_root(tmp_path, package="pyyaml")
     assert index.modules["_yaml"].is_native
+
+
+def test_ast_cache_is_off_by_default(tree, tmp_path_factory, monkeypatch):
+    root = tree({"m.py": "def go():\n    return 1\n"})
+    unused = tmp_path_factory.mktemp("unused_ast_cache")
+    monkeypatch.setattr(index_mod, "DEFAULT_CACHE", unused)
+    Index().add_root(root, is_app=True)
+    assert not list(unused.glob("*"))
+
+
+def test_ast_cache_skips_reparsing_an_unchanged_file(tree, tmp_path_factory, monkeypatch):
+    root = tree({"m.py": "def go():\n    return 1\n"})
+    cache_dir = tmp_path_factory.mktemp("ast_cache")
+
+    Index().add_root(root, is_app=True, cache=cache_dir)
+    assert list(cache_dir.glob("*.pkl"))
+
+    def boom(*args, **kwargs):
+        raise AssertionError("a cache hit should not reach the indexer")
+
+    monkeypatch.setattr(index_mod, "_Indexer", boom)
+    reloaded = Index()
+    reloaded.add_root(root, is_app=True, cache=cache_dir)
+    assert "go" in reloaded.modules["m"].scopes
+
+
+def test_ast_cache_invalidates_on_content_change(tree, tmp_path_factory):
+    root = tree({"m.py": "def go():\n    return 1\n"})
+    cache_dir = tmp_path_factory.mktemp("ast_cache")
+
+    Index().add_root(root, is_app=True, cache=cache_dir)
+    (root / "m.py").write_text("def go():\n    return 1\n\ndef extra():\n    return 2\n")
+
+    reloaded = Index()
+    reloaded.add_root(root, is_app=True, cache=cache_dir)
+    assert "extra" in reloaded.modules["m"].scopes
 
 
 def test_class_attribute_types(tree):
