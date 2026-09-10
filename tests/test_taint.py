@@ -83,3 +83,48 @@ def test_import_time_sink_is_unknown_not_clean(tree):
     result = verdict(root, "vuln.bad")
     assert result.status == "unknown"
     assert "import edge" in result.reason
+
+
+def test_taint_carried_on_object_state_reaches_the_sink(tree):
+    """`Command(client_id=tainted).run()` -- the value rides on `self`, not an argument."""
+    root = tree({
+        "app.py": ROUTE.replace(
+            "BODY",
+            "client_id = request.args.get('id')\n    cmd = command.Command(client_id)\n    return cmd.run()",
+        ).replace("import vuln", "import command"),
+        "command.py": (
+            "import vuln\n\n"
+            "class Command:\n"
+            "    def __init__(self, client_id):\n"
+            "        self.client_id = client_id\n\n"
+            "    def run(self):\n"
+            "        return vuln.bad(self.client_id)\n"
+        ),
+        "vuln.py": "def bad(value):\n    return value\n",
+    })
+    result = verdict(root, "vuln.bad")
+    assert result.status == "tainted"
+    assert "request.args" in result.source
+    assert len(result.hops) == 2
+
+
+def test_object_state_stays_unknown_past_a_transform_in_init(tree):
+    """`self.client_id = str(client_id)` is a transform, not a bare assignment -- stay honest."""
+    root = tree({
+        "app.py": ROUTE.replace(
+            "BODY",
+            "client_id = request.args.get('id')\n    cmd = command.Command(client_id)\n    return cmd.run()",
+        ).replace("import vuln", "import command"),
+        "command.py": (
+            "import vuln\n\n"
+            "class Command:\n"
+            "    def __init__(self, client_id):\n"
+            "        self.client_id = str(client_id)\n\n"
+            "    def run(self):\n"
+            "        return vuln.bad(self.client_id)\n"
+        ),
+        "vuln.py": "def bad(value):\n    return value\n",
+    })
+    result = verdict(root, "vuln.bad")
+    assert result.status == "unknown"
+    assert "no plain attribute assignment" in result.reason

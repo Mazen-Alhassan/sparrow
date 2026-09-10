@@ -80,7 +80,7 @@ def _expression_taint(node: ast.AST, tainted: set[str]) -> str:
             return child.id
         if isinstance(child, ast.Attribute):
             base = dotted(child)
-            if base and base.split(".")[0] in tainted:
+            if base and (base in tainted or base.split(".")[0] in tainted):
                 return base
     return ""
 
@@ -119,6 +119,88 @@ def _param_names(node: ast.AST) -> list[str]:
     args = node.args
     names = [a.arg for a in list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)]
     return [n for n in names if n not in ("self", "cls")]
+
+
+def _self_param(node: ast.AST) -> str:
+    """The name a method uses for its instance argument. Almost always `self`, but not assumed."""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.args.args:
+        return node.args.args[0].arg
+    return "self"
+
+
+def _init_attr_params(class_def: ast.ClassDef) -> tuple[list[str], dict[str, str]]:
+    """`__init__`'s parameter order and any plain `self.<attr> = <param>` assignments in its body.
+
+    Only a bare parameter assigned straight to an attribute counts. Anything derived -- a default,
+    a transform, a value stitched from more than one argument -- is left untracked rather than
+    guessed at.
+    """
+    for item in class_def.body:
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "__init__":
+            self_name = _self_param(item)
+            params = _param_names(item)
+            attrs: dict[str, str] = {}
+            for statement in ast.walk(item):
+                if not (isinstance(statement, ast.Assign) and len(statement.targets) == 1):
+                    continue
+                target = statement.targets[0]
+                if (isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name)
+                        and target.value.id == self_name and isinstance(statement.value, ast.Name)
+                        and statement.value.id in params):
+                    attrs[target.attr] = statement.value.id
+            return params, attrs
+    return [], {}
+
+
+def _constructor_tainted_attrs(definition: ast.AST, receiver_name: str, class_name: str,
+                               params: list[str], attrs: dict[str, str],
+                               tainted: set[str]) -> set[str]:
+    """Attributes on `receiver_name` whose value came from a tainted constructor argument."""
+    found: set[str] = set()
+    for statement in ast.walk(definition):
+        if not (isinstance(statement, ast.Assign) and len(statement.targets) == 1):
+            continue
+        target = statement.targets[0]
+        call = statement.value
+        if not (isinstance(target, ast.Name) and target.id == receiver_name and isinstance(call, ast.Call)):
+            continue
+        callee = dotted(call.func)
+        if not callee or callee.split(".")[-1] != class_name:
+            continue
+        bound: dict[str, ast.AST] = {}
+        for position, argument in enumerate(call.args):
+            if position < len(params):
+                bound[params[position]] = argument
+        for keyword in call.keywords:
+            if keyword.arg:
+                bound[keyword.arg] = keyword.value
+        for attr, param in attrs.items():
+            value = bound.get(param)
+            if value is not None and _expression_taint(value, tainted):
+                found.add(attr)
+    return found
+
+
+def _object_state_taint(definition: ast.AST, receiver_name: str, following: dict,
+                        tainted: set[str]) -> set[str]:
+    """Attributes tainted on an object built earlier in this frame, e.g. `Command(client_id=raw)`.
+
+    Reachability already knows `following` is the method the receiver is called on. If that class's
+    `__init__` assigns one of its parameters straight to an attribute, and this frame constructed the
+    receiver with a tainted value for that parameter, the attribute carries the taint into the method.
+    """
+    qualname = following["node"].split(":", 1)[1]
+    if "." not in qualname:
+        return set()
+    class_qual = qualname.rsplit(".", 1)[0]
+    tree = _parse(following["file"])
+    class_def = _find_def(tree, class_qual) if tree else None
+    if not isinstance(class_def, ast.ClassDef):
+        return set()
+    params, attrs = _init_attr_params(class_def)
+    if not attrs:
+        return set()
+    return _constructor_tainted_attrs(definition, receiver_name, class_def.name, params, attrs, tainted)
 
 
 def _calls_to(node: ast.AST, target_name: str) -> list[ast.Call]:
@@ -192,6 +274,7 @@ def trace(path_frames: list[dict], index: Index, entry_kind: str) -> TaintResult
 
         carried = ""
         receiver_carried = ""
+        receiver_call: ast.Call | None = None
         for call in call_sites:
             for argument in list(call.args) + [kw.value for kw in call.keywords]:
                 found = _expression_taint(argument, tainted)
@@ -200,15 +283,27 @@ def trace(path_frames: list[dict], index: Index, entry_kind: str) -> TaintResult
                     if _is_source_text(found):
                         break
             if isinstance(call.func, ast.Attribute):
-                receiver_carried = _expression_taint(call.func.value, tainted) or receiver_carried
+                found_receiver = _expression_taint(call.func.value, tainted)
+                if found_receiver:
+                    receiver_carried = found_receiver
+                    receiver_call = call
+
+        object_attrs: set[str] = set()
+        if not carried and receiver_call is not None and isinstance(receiver_call.func, ast.Attribute) \
+                and isinstance(receiver_call.func.value, ast.Name):
+            object_attrs = _object_state_taint(definition, receiver_call.func.value.id, following, tainted)
+            if object_attrs:
+                carried = f"{receiver_call.func.value.id}.{sorted(object_attrs)[0]}"
+
         if not carried:
             if receiver_carried:
-                # `Command(client_id=tainted).run()`. The value is on the object, and object state
-                # is not tracked, so calling this clean would be a guess dressed as an answer.
+                # `Command(client_id=tainted).run()` where `run` never reads `client_id` back, or
+                # reads it via something more than a bare `self.<attr> = <param>` in `__init__`.
+                # Calling this clean would be a guess dressed as an answer.
                 return TaintResult(
                     UNKNOWN,
                     f"{next_name} takes no tainted argument, but its receiver was built from "
-                    f"{receiver_carried}, and values carried on object state are not tracked",
+                    f"{receiver_carried}, and no plain attribute assignment carries it into {next_name}",
                     source=source or receiver_carried, broke_at=frame["node"], hops=hops)
             return TaintResult(CLEAN, f"{next_name} is called with no request derived argument",
                                source=source, broke_at=frame["node"], hops=hops)
@@ -221,6 +316,9 @@ def trace(path_frames: list[dict], index: Index, entry_kind: str) -> TaintResult
         next_tree = _parse(following["file"])
         next_def = _find_def(next_tree, following["node"].split(":", 1)[1]) if next_tree else None
         tainted = set(_param_names(next_def)) if next_def else set()
+        if object_attrs and next_def is not None:
+            self_name = _self_param(next_def)
+            tainted |= {f"{self_name}.{attr}" for attr in object_attrs}
         if not tainted and position + 1 < len(path_frames) - 1:
             return TaintResult(UNKNOWN, f"{next_name} takes no named parameters to carry it",
                                source=source, broke_at=following["node"], hops=hops)
