@@ -130,6 +130,22 @@ class OtherAdmin:
     assert ("django_admin", "site.admin:OtherAdmin.get_queryset") in found
 
 
+def test_gunicorn_config_hooks_are_entry_points(tree):
+    root = tree({
+        "gunicorn.conf.py": """
+def post_fork(server, worker):
+    return 1
+
+def not_a_hook():
+    return 1
+""",
+    })
+    _, _, entries, _ = analyse(root)
+    found = kinds(entries)
+    assert ("gunicorn_hook", "gunicorn_conf:post_fork") in found
+    assert not any(node.endswith(":not_a_hook") for _, node in found)
+
+
 def test_tests_are_excluded_by_default(tree):
     root = tree({
         "tests/__init__.py": "",

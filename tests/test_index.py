@@ -30,6 +30,21 @@ def test_digit_led_migration_calls_are_indexed(tree):
     assert any(c.target == "vuln.bad" for c in calls)
 
 
+def test_module_name_for_a_dotted_stem_like_gunicorn_conf(tmp_path):
+    (tmp_path / "gunicorn.conf.py").write_text("")
+    assert module_name_for(tmp_path / "gunicorn.conf.py", tmp_path) == "gunicorn_conf"
+
+
+def test_gunicorn_conf_calls_are_indexed(tree):
+    root = tree({
+        "gunicorn.conf.py": "import vuln\n\ndef post_fork(server, worker):\n    vuln.bad()\n",
+    })
+    index, graph = build(root)
+    assert "gunicorn_conf" in index.modules
+    calls = index.modules["gunicorn_conf"].scopes["post_fork"].calls
+    assert any(c.target == "vuln.bad" for c in calls)
+
+
 def test_relative_imports_resolve(tree):
     root = tree({
         "pkg/__init__.py": "",

@@ -28,6 +28,13 @@ CLI_DECORATORS = re.compile(r"(^|\.)(command|group|cli)$")
 SIGNAL_DECORATORS = re.compile(r"(^|\.)(receiver|connect|listens_for|on_event|before_request|"
                                r"after_request|teardown_request|errorhandler|hookimpl)$")
 ADMIN_REGISTER = re.compile(r"(^|\.)register$")
+# Server hooks gunicorn calls by name if it finds them defined at module level in the config file
+# it loads, with no call site anywhere in the application to point at.
+GUNICORN_HOOKS = (
+    "on_starting", "on_reload", "when_ready", "pre_fork", "post_fork", "pre_worker_init",
+    "post_worker_init", "worker_int", "worker_abort", "pre_exec", "pre_request", "post_request",
+    "child_exit", "worker_exit", "nworkers_changed", "on_exit", "ssl_context",
+)
 # Hooks the Django admin site calls on a registered ModelAdmin while serving a request. Not every
 # subclass overrides all of these, so only the ones actually defined are added.
 ADMIN_HOOKS = ("save_model", "delete_model", "save_formset", "delete_queryset", "get_queryset",
@@ -105,6 +112,7 @@ def discover(index: Index, graph: CallGraph, target_root: Path,
     _entry_point_metadata(index, graph, target_root, add)
     _as_view_calls(index, graph, app_modules, add)
     _django_admin(index, graph, app_modules, add)
+    _gunicorn_hooks(app_modules, add)
 
     if include_tests:
         for module in index.modules.values():
@@ -219,6 +227,18 @@ def _django_admin(index: Index, graph: CallGraph, app_modules, add) -> None:
         for qualname, info in module.classes.items():
             if any(d.split(".")[0] == "admin" and ADMIN_REGISTER.search(d) for d in info.decorators if d):
                 mark(info.node_id, "admin.register")
+
+
+def _gunicorn_hooks(app_modules, add) -> None:
+    """`gunicorn.conf.py` in the app root is auto-loaded, and any hook it defines is called
+    directly by the server -- with no call site anywhere in the repository to point at.
+    """
+    for module in app_modules:
+        if Path(module.file).name != "gunicorn.conf.py":
+            continue
+        for qualname, scope in module.scopes.items():
+            if qualname in GUNICORN_HOOKS:
+                add("gunicorn_hook", scope.node_id, qualname)
 
 
 def _record_target(index: Index, graph: CallGraph, target: str, kind: str, detail: str, add) -> None:
