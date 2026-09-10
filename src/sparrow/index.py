@@ -525,6 +525,10 @@ def module_name_for(path: Path, root: Path) -> str | None:
     # file path rather than import, so this name is synthetic, but it still lets the indexer
     # see the calls a migration makes instead of silently dropping the file.
     parts = [f"_{p}" if p and p[0].isdigit() else p for p in parts]
+    # `gunicorn.conf.py`, `settings.local.py`: a stem with its own dot before the final `.py`
+    # is real code that a server loads and runs, not a package name, so it gets the same
+    # synthetic treatment rather than vanishing from the index.
+    parts = [p.replace(".", "_") if p and not p.isidentifier() else p for p in parts]
     if any(not p.isidentifier() for p in parts):
         return None
     return ".".join(parts)
