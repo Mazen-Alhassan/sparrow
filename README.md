@@ -72,6 +72,3 @@ Results
 Every extracted sink is checked against the actual package: the named function must exist in the
 vulnerable version and be absent or changed in the fixed one. 21 advisories produced no verified
 sink and were sent to undetermined rather than being cleared.
-
-Full run in [FINDINGS.md](FINDINGS.md): every call path, why each of the 17 was ruled out, the
-ranked list of what defeats the call graph, and what the adversary broke.
