@@ -75,16 +75,3 @@ sink and were sent to undetermined rather than being cleared.
 
 Full run in [FINDINGS.md](FINDINGS.md): every call path, why each of the 17 was ruled out, the
 ranked list of what defeats the call graph, and what the adversary broke.
-
-Known limitations
-
-- Python only.
-- Reachable doesn't mean exploitable. These 4 findings are leads to investigate, not confirmed exploits. The tracker found 1 tainted result and 3 undetermined.
-- Reflection is undetermined. Computed getattr names cause the entire target module to be marked undetermined.
-- C extensions are opaque. 129 compiled modules were seen and none were analysed.
-- Migrations are indexed but not entry points. Superset's 293 alembic files used to be skipped outright for having invalid module names; that part is fixed, but alembic still calls `upgrade()`/`downgrade()` by path rather than by import, so nothing in the call graph reaches them, and a vulnerability reachable only from a migration is still invisible.
-- unreachable can be wrong in deployment. Plugins, feature flags, and configuration can introduce new entry points.
-- Monkeypatching can mislead the graph. Reassigned methods still point to the original function. See case 9 in tests/adversarial/RESULTS.md.
-- Sink extraction is imperfect. Advisory text extraction is only ~40% accurate. The verifier catches wrong results and marks them undetermined.
-- Two of the four reachable findings have a class attribute as their sink, so "reachable" there means
-  the class is constructed, not that a vulnerable function runs. See FINDINGS.md section 1.
