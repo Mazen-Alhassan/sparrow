@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .deps import Package
 from .net import context
 
 QUERYBATCH = "https://api.osv.dev/v1/querybatch"
@@ -77,7 +78,8 @@ def _get(url: str, timeout: int = 60) -> dict:
         return json.loads(resp.read())
 
 
-def query_batch(packages, cache: Path = DEFAULT_CACHE, offline: bool = False) -> dict[str, list[str]]:
+def query_batch(packages: list[Package], cache: Path = DEFAULT_CACHE,
+                offline: bool = False) -> dict[str, list[str]]:
     """Map package name to the advisory ids affecting its pinned version."""
     cache.mkdir(parents=True, exist_ok=True)
     key = cache / "querybatch.json"

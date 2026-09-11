@@ -14,10 +14,12 @@ import tarfile
 import urllib.error
 import urllib.request
 import zipfile
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
+from .deps import Package
 from .net import context
 
 PYPI = "https://pypi.org/pypi/{name}/{version}/json"
@@ -166,7 +168,8 @@ def fetch_one(name: str, version: str, cache: Path = DEFAULT_CACHE, force: bool 
     return Unpacked(name, version, src, kind, top, native)
 
 
-def fetch_all(packages, cache: Path = DEFAULT_CACHE, workers: int = 12, progress=None) -> list[Unpacked]:
+def fetch_all(packages: list[Package], cache: Path = DEFAULT_CACHE, workers: int = 12,
+              progress: Callable[[Unpacked], None] | None = None) -> list[Unpacked]:
     out: list[Unpacked] = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(fetch_one, p.name, p.version, cache): p for p in packages}
