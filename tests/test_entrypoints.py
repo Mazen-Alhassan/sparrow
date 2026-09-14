@@ -154,3 +154,60 @@ def test_tests_are_excluded_by_default(tree):
     })
     _, _, entries, _ = analyse(root)
     assert not any(e.node.startswith("tests.") for e in entries)
+
+
+def test_plugin_entry_point_group_from_pyproject(tree):
+    root = tree({
+        "pyproject.toml": '[project]\nname="x"\nversion="1"\n\n'
+                           '[project.entry-points."x.plugins"]\nfoo = "tool.plugins:register"\n',
+        "tool/__init__.py": "",
+        "tool/plugins.py": "def register():\n    return 1\n",
+    })
+    _, _, entries, _ = analyse(root)
+    assert ("plugin_entry", "tool.plugins:register") in kinds(entries)
+
+
+def test_poetry_scripts_from_pyproject(tree):
+    root = tree({
+        "pyproject.toml": '[tool.poetry]\nname="x"\nversion="1"\n\n'
+                           '[tool.poetry.scripts]\nrun-it = "tool.cli:main"\n',
+        "tool/__init__.py": "",
+        "tool/cli.py": "def main():\n    return 1\n",
+    })
+    _, _, entries, _ = analyse(root)
+    assert ("console_script", "tool.cli:main") in kinds(entries)
+
+
+def test_setup_cfg_entry_points(tree):
+    root = tree({
+        "setup.cfg": "[options.entry_points]\nconsole_scripts =\n    run-it = tool.cli:main\n",
+        "tool/__init__.py": "",
+        "tool/cli.py": "def main():\n    return 1\n",
+    })
+    _, _, entries, _ = analyse(root)
+    assert ("console_script", "tool.cli:main") in kinds(entries)
+
+
+def test_setup_py_entry_points(tree):
+    root = tree({
+        "setup.py": (
+            "from setuptools import setup\n"
+            "setup(\n"
+            "    name='x',\n"
+            "    entry_points={'console_scripts': ['run-it=tool.cli:main']},\n"
+            ")\n"
+        ),
+        "tool/__init__.py": "",
+        "tool/cli.py": "def main():\n    return 1\n",
+    })
+    _, _, entries, _ = analyse(root)
+    assert ("console_script", "tool.cli:main") in kinds(entries)
+
+
+def test_app_factory_with_no_callers_is_an_entry_point(tree):
+    root = tree({
+        "svc/__init__.py": "",
+        "svc/app.py": "def create_app():\n    return 1\n",
+    })
+    _, _, entries, _ = analyse(root)
+    assert ("app_factory", "svc.app:create_app") in kinds(entries)
