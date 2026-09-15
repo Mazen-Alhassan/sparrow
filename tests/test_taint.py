@@ -35,6 +35,17 @@ def test_request_argument_reaches_the_sink(tree):
     assert "request.args" in result.source
 
 
+def test_augmented_assignment_carries_taint(tree):
+    root = tree({
+        "app.py": ROUTE.replace(
+            "BODY", "buf = 'prefix-'\n    buf += request.args.get('q')\n    return vuln.bad(buf)"),
+        "vuln.py": "def bad(value):\n    return value\n",
+    })
+    result = verdict(root, "vuln.bad")
+    assert result.status == "tainted"
+    assert "request.args" in result.source
+
+
 def test_constant_argument_is_clean(tree):
     root = tree({
         "app.py": ROUTE.replace("BODY", "return vuln.bad('a fixed string')"),
