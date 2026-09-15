@@ -14,6 +14,7 @@ import urllib.request
 from pathlib import Path
 
 from ..net import context
+from ..osv import Advisory
 
 DEFAULT_CACHE = Path.home() / ".cache" / "sparrow" / "patches"
 COMMIT = re.compile(r"https?://github\.com/([^/]+)/([^/]+)/commit/([0-9a-f]{7,40})")
@@ -21,7 +22,7 @@ PULL = re.compile(r"https?://github\.com/([^/]+)/([^/]+)/pull/(\d+)/?$")
 FILE_HEADER = re.compile(r"^diff --git a/(\S+) b/(\S+)$")
 
 
-def patch_urls(advisory) -> list[str]:
+def patch_urls(advisory: Advisory) -> list[str]:
     urls: list[str] = []
     for reference in advisory.references:
         url = reference.get("url", "")
@@ -86,7 +87,7 @@ def python_hunks(patch: str, max_chars: int = 9000) -> str:
     return "\n".join(out)
 
 
-def patch_context(advisory, cache: Path = DEFAULT_CACHE, max_chars: int = 9000) -> str:
+def patch_context(advisory: Advisory, cache: Path = DEFAULT_CACHE, max_chars: int = 9000) -> str:
     chunks: list[str] = []
     budget = max_chars
     for url in patch_urls(advisory):

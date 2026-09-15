@@ -13,6 +13,8 @@ from pathlib import Path
 
 from ..fetch import DEFAULT_CACHE, Unpacked, fetch_one, source_dirs
 from ..index import module_name_for
+from ..osv import Advisory
+from .extract import SinkRecord
 
 VERIFIED = "verified"
 ABSENT = "absent_in_vulnerable"
@@ -123,7 +125,7 @@ def verify_sink(package: str, sink: str, vulnerable_version: str, fixed_version:
     return result
 
 
-def verify_record(record, advisory, cache: Path = DEFAULT_CACHE) -> dict:
+def verify_record(record: SinkRecord, advisory: Advisory, cache: Path = DEFAULT_CACHE) -> dict:
     """Try each listed fixed version. Advisories sometimes name a release that was later yanked."""
     out = {}
     for sink in record.sinks:
