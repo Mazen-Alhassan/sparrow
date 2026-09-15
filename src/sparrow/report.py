@@ -11,6 +11,7 @@ import os
 import sys
 import textwrap
 from pathlib import Path
+from typing import IO
 
 from .reach import REACHABLE, UNDETERMINED, UNREACHABLE
 
@@ -52,7 +53,7 @@ def _colour_enabled(stream) -> bool:
 
 
 class Renderer:
-    def __init__(self, stream=None) -> None:
+    def __init__(self, stream: IO[str] | None = None) -> None:
         self.stream = stream or sys.stdout
         self.colour = _colour_enabled(self.stream)
 
@@ -177,7 +178,7 @@ class Renderer:
         self.write()
 
 
-def render(results: dict, stream=None, show: str = "reachable", limit: int = 0) -> None:
+def render(results: dict, stream: IO[str] | None = None, show: str = "reachable", limit: int = 0) -> None:
     renderer = Renderer(stream)
     renderer.header(results)
     renderer.funnel(results)
