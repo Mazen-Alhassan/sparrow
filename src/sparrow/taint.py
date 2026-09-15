@@ -249,7 +249,7 @@ def trace(path_frames: list[dict], index: Index, entry_kind: str) -> TaintResult
                 source = source or f"{qualname}({name})"
 
         for statement in ast.walk(definition):
-            if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            if isinstance(statement, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
                 value = statement.value
                 if value is None:
                     continue
@@ -257,7 +257,10 @@ def trace(path_frames: list[dict], index: Index, entry_kind: str) -> TaintResult
                 if not carried:
                     continue
                 source = source or carried
-                targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+                if isinstance(statement, ast.Assign):
+                    targets = statement.targets
+                else:
+                    targets = [statement.target]
                 for target in targets:
                     if isinstance(target, ast.Name):
                         tainted.add(target.id)
