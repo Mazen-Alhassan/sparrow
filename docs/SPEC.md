@@ -45,8 +45,9 @@ omission, because the interesting cases are exactly the ones a static graph cann
 - **Exploitability.** Reachable means callable. It does not mean an attacker controls the arguments.
   A reachable finding is a candidate for triage, not a confirmed exploit.
 - **Full data flow.** Taint tracking is partial: flow-sensitive inside a function, positional across
-  a call, no sanitiser model, no object state, no containers. It answers `tainted`, `clean`, or
-  `unknown`, and it prefers `unknown` to a `clean` it cannot justify.
+  a call, no sanitiser model, no containers. Object state is tracked only for the narrow case of a
+  bare `self.attr = param` assignment in `__init__`; anything derived is left `unknown`. It answers
+  `tainted`, `clean`, or `unknown`, and it prefers `unknown` to a `clean` it cannot justify.
 - **Reflection.** `getattr`, `eval`, `importlib`, and plugin loaders are undetermined by construction.
   They are detected and counted, never silently resolved.
 - **C extensions.** A call that crosses into a compiled module is opaque. The boundary is recorded.
