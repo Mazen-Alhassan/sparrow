@@ -105,14 +105,70 @@ def query_batch(packages, cache: Path = DEFAULT_CACHE, offline: bool = False) ->
     return hits
 
 
+# CVSS v3 base metric weights, straight from the spec. A PYSEC record with no GHSA counterpart
+# often carries only a CVSS vector and no `database_specific.severity`, and that vector is the
+# only severity signal OSV gives us for it.
+_CVSS_AV = {"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2}
+_CVSS_AC = {"L": 0.77, "H": 0.44}
+_CVSS_PR_UNCHANGED = {"N": 0.85, "L": 0.62, "H": 0.27}
+_CVSS_PR_CHANGED = {"N": 0.85, "L": 0.68, "H": 0.5}
+_CVSS_UI = {"N": 0.85, "R": 0.62}
+_CVSS_CIA = {"H": 0.56, "L": 0.22, "N": 0.0}
+
+
+def _cvss_roundup(value: float) -> float:
+    """The spec's own rounding rule: up to one decimal place, not the usual round-half-even."""
+    scaled = round(value * 100000)
+    if scaled % 10000 == 0:
+        return scaled / 100000
+    return (scaled // 10000 + 1) / 10
+
+
+def _cvss_base_score(vector: str) -> float | None:
+    """CVSS v3.0/v3.1 base score from a vector string. `None` for anything else or malformed."""
+    if not (vector.startswith("CVSS:3.0/") or vector.startswith("CVSS:3.1/")):
+        return None
+    metrics = dict(part.split(":", 1) for part in vector.split("/")[1:] if ":" in part)
+    try:
+        av, ac, ui = _CVSS_AV[metrics["AV"]], _CVSS_AC[metrics["AC"]], _CVSS_UI[metrics["UI"]]
+        scope_changed = metrics["S"] == "C"
+        pr = (_CVSS_PR_CHANGED if scope_changed else _CVSS_PR_UNCHANGED)[metrics["PR"]]
+        c, i, a = _CVSS_CIA[metrics["C"]], _CVSS_CIA[metrics["I"]], _CVSS_CIA[metrics["A"]]
+    except KeyError:
+        return None
+    iss = 1 - (1 - c) * (1 - i) * (1 - a)
+    if scope_changed:
+        impact = 7.52 * (iss - 0.029) - 3.25 * (iss - 0.02) ** 15
+    else:
+        impact = 6.42 * iss
+    if impact <= 0:
+        return 0.0
+    exploitability = 8.22 * av * ac * pr * ui
+    combined = impact + exploitability
+    return _cvss_roundup(min(1.08 * combined if scope_changed else combined, 10.0))
+
+
+def _cvss_severity(score: float) -> str:
+    """The rating bands the CVSS spec itself defines for a base score."""
+    if score >= 9.0:
+        return "critical"
+    if score >= 7.0:
+        return "high"
+    if score >= 4.0:
+        return "moderate"
+    if score > 0.0:
+        return "low"
+    return "unknown"
+
+
 def _severity_of(record: dict) -> str:
     db = (record.get("database_specific") or {}).get("severity")
     if db:
         return db.lower()
     for sev in record.get("severity", []):
-        score = sev.get("score", "")
-        if score.startswith("CVSS:"):
-            return "unknown"
+        score = _cvss_base_score(sev.get("score", ""))
+        if score is not None:
+            return _cvss_severity(score)
     return "unknown"
 
 

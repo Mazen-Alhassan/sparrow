@@ -39,6 +39,38 @@ def test_severity_of_prefers_database_specific_field():
     assert osv._severity_of({}) == "unknown"
 
 
+def test_severity_of_falls_back_to_cvss_vector_when_no_database_specific_field():
+    # A PYSEC record with no GHSA counterpart typically has no `database_specific.severity`,
+    # only a CVSS vector, and used to fall through to "unknown" even when the vector itself
+    # said "critical".
+    record = {"severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}
+    assert osv._severity_of(record) == "critical"
+
+
+def test_cvss_base_score_matches_the_well_known_unauthenticated_rce_vector():
+    score = osv._cvss_base_score("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")
+    assert score == 9.8
+
+
+def test_cvss_base_score_handles_a_scope_changed_vector():
+    score = osv._cvss_base_score("CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H")
+    assert score == 9.6
+
+
+def test_cvss_base_score_rejects_unsupported_versions_and_malformed_vectors():
+    assert osv._cvss_base_score("CVSS:2.0/AV:N/AC:L/Au:N/C:C/I:C/A:C") is None
+    assert osv._cvss_base_score("not a vector") is None
+    assert osv._cvss_base_score("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H") is None  # missing A
+
+
+def test_cvss_severity_bands_match_the_spec():
+    assert osv._cvss_severity(9.0) == "critical"
+    assert osv._cvss_severity(8.9) == "high"
+    assert osv._cvss_severity(4.0) == "moderate"
+    assert osv._cvss_severity(3.9) == "low"
+    assert osv._cvss_severity(0.0) == "unknown"
+
+
 def test_fixed_versions_matches_the_named_package_case_insensitively():
     record = {"affected": [
         {"package": {"name": "Flask"}, "ranges": [{"events": [{"introduced": "0"}, {"fixed": "2.3.2"}]}]},
