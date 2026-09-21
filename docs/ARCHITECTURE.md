@@ -262,8 +262,10 @@ Sources are the Flask and Django request accessors (`request.args`, `.form`, `.j
 `http_route` entry point, which is how URL path converters arrive.
 
 Propagation is flow-sensitive within a function and positional across a call. Any function call is
-treated as passing taint through, which over-approximates in the direction of `tainted`. The one
-place it deliberately refuses to answer is when the tainted value reaches the receiver of a call
-rather than its arguments: `Command(client_id=tainted).run()` puts the value on object state, which
-is not tracked, so the verdict is `unknown` and not `clean`. A wrong `clean` costs the same as a
-wrong `unreachable` and the rule exists to avoid it.
+treated as passing taint through, which over-approximates in the direction of `tainted`. When the
+tainted value reaches the receiver of a call rather than its arguments -- `Command(client_id=tainted)
+.run()` -- the value rides on object state instead of an argument. That is tracked, but only for the
+narrow case where `__init__` assigns the constructor parameter straight to `self.<attr>`, with no
+default, no transform, and no expression built from more than one argument. Outside that shape the
+verdict stays `unknown`, not `clean`. A wrong `clean` costs the same as a wrong `unreachable` and the
+rule exists to avoid it.
